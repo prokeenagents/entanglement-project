@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Next.js: attach",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost",
+            "timeout": 30000,
+            "port": 3210,
+            "restart": true,
+            "sourceMaps": true,
+            "autoAttachChildProcesses": true,
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "name": "Next.js: attach to SERVER",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost",
+            "timeout": 30000,
+            "port": 3211,
+            "restart": true,
+            "sourceMaps": true,
+            "autoAttachChildProcesses": true,
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "name": "Next.js: debug (webpack, like ms-ui)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run dev:debug",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

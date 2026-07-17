@@ -1,0 +1,10 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false,
+    "editor.insertSpaces": true,
+    // The fix is this. Ignore the prettier.ignorePath
+    // Add some dummy path
+    "prettier.ignorePath": ".prettierignore123"
+}
