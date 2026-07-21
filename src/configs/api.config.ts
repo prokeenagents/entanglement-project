@@ -60,6 +60,9 @@ export const AUTH_API_CONFIG = {
     },
     CONSUMER_PROFILE: {
         URL: '/api/consumer/profile'
+    },
+    CONSUMER_RESET_PASSWORD: {
+        URL: '/api/consumer/reset-password'
     }
 };
 

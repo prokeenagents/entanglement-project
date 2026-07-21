@@ -1,5 +1,6 @@
 import { getKeen } from '@/service/services/keen/keen';
 import KeenConnector from '@/service/services/keen/keen.connector';
+import { AuthProvider } from '@/contexts/auth';
 import { ConsumerProvider } from '@/contexts/consumer';
 import { Suspense } from 'react';
 import { Header } from '@/components/ui/header';
@@ -36,5 +37,11 @@ async function ProviderShell(
     const { children, keen } = props;
     const consumerData = await keen.tools.getConsumerData();
 
-    return <ConsumerProvider value={consumerData}>{children}</ConsumerProvider>;
+    // AuthProvider owns the mutable IDENTITY (the token payload); ConsumerProvider
+    // owns the spaces / agents / chat. Both seed from the one server fetch.
+    return (
+        <AuthProvider value={consumerData.tokenPayload}>
+            <ConsumerProvider value={consumerData}>{children}</ConsumerProvider>
+        </AuthProvider>
+    );
 }

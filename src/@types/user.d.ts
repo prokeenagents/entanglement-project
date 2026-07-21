@@ -29,6 +29,12 @@ declare global {
                 success: boolean;
                 message?: string;
             }
+
+            /** The "change my password" form on the account page — new password + confirm. */
+            interface PasswordForm {
+                password: string;
+                confirmPassword: string;
+            }
         }
     }
 }

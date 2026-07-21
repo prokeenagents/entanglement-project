@@ -3,7 +3,7 @@
 import { HStack, IconButton, Text, VStack } from '@chakra-ui/react';
 import { Logo } from '../logo';
 import { useRouter } from 'next/navigation';
-import { useConsumer } from '@/contexts/consumer';
+import { useAuth } from '@/contexts/auth';
 import { FaRegUser } from 'react-icons/fa';
 import { FiLogOut } from 'react-icons/fi';
 import { PiLineVertical } from 'react-icons/pi';
@@ -12,7 +12,7 @@ import { useLogin } from '@/hooks/login';
 
 export const Component: React.FC = () => {
     const router = useRouter();
-    const consumer = useConsumer();
+    const { identity } = useAuth();
     const loginHook = useLogin();
 
     return (
@@ -33,10 +33,10 @@ export const Component: React.FC = () => {
                 <HStack>
                     <VStack gap="0" alignItems="flex-end">
                         <Text fontSize="sm" lineHeight="1.2">
-                            <strong>{consumer.tokenPayload?.username}</strong>
+                            <strong>{identity?.username}</strong>
                         </Text>
                         <Text fontSize="xs" opacity="0.75" lineHeight="1.2">
-                            {consumer.tokenPayload?.email}
+                            {identity?.email}
                         </Text>
                     </VStack>
                     <Tooltip content="Account">
