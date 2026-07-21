@@ -111,7 +111,7 @@ URL exactly and are prefix-allowed in `proxy-page-guest.ts` — `/set-password/`
 
 | Group | Purpose |
 | --- | --- |
-| `(app)` | Authenticated — home, `space/[id]`, `space/[id]/[agentID]`, `space/[id]/[agentID]/[chatID]` (live chat) |
+| `(app)` | Authenticated — home, `user` (account page), `space/[id]`, `space/[id]/[agentID]`, `space/[id]/[agentID]/[chatID]` (live chat) |
 | `(login)` | `login` (+ OTP), `reset-password`, `set-password/[hash]` |
 | `(registration)` | `registration`, `confirmation/[hash]` |
 | `(maintanance)` | Shown when the connector isn't ready |
@@ -120,8 +120,14 @@ URL exactly and are prefix-allowed in `proxy-page-guest.ts` — `/set-password/`
 `src/app/api/*` are Route Handlers — the only place the browser talks to the
 server about auth (`login`, `otp`, `logout`, `registration`, `reset-password`,
 `set-password`), the two-token `chat/*` proxies (`list`, `history`, `search`,
-`title`, `delete`) and `refresh`, plus the Keen `keen-webhook` / `keen-callback`
-receivers.
+`title`, `delete`), the two-token `consumer/*` proxies (`profile` read + `update`
+write — backing the `/user` account page), and `refresh`, plus the Keen
+`keen-webhook` / `keen-callback` receivers.
+
+The `/user` account page reads the profile server-side (`GET /api/consumer/profile`
+→ Keen's new `GET /v1/consumer/profile`) to **prefill** the form, and saves via
+`POST /api/consumer/update` as a partial update. Email + password aren't editable
+there (email is the identity; password has its own reset flow).
 
 ### Consumer context
 

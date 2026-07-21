@@ -93,6 +93,31 @@ declare global {
             callbackUrl?: string;
         }
 
+        /** GET /keen-api/consumer/profile — two tokens; the target is the access token's own account. */
+        interface ConsumerProfileBody {
+            accessToken: string;
+        }
+
+        /** The consumer's editable profile — nullable because the account fields are optional. */
+        interface ConsumerProfile {
+            firstName: string | null;
+            lastName: string | null;
+            gender: 'male' | 'female' | 'other' | null;
+            dobDay: string | null;
+            dobMonth: string | null;
+            dobYear: string | null;
+            email: string;
+        }
+
+        /** Envelope the relay forwards from ms-consumer for the profile read. */
+        interface ConsumerProfileReply {
+            success: boolean;
+            status?: number;
+            code?: string;
+            message?: string;
+            data?: Keen.ConsumerProfile;
+        }
+
         interface ConsumerResetPasswordClaimBody {
             email: string;
             password: string;

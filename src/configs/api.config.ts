@@ -54,6 +54,12 @@ export const AUTH_API_CONFIG = {
     },
     CHAT_DELETE: {
         URL: '/api/chat/delete'
+    },
+    CONSUMER_UPDATE: {
+        URL: '/api/consumer/update'
+    },
+    CONSUMER_PROFILE: {
+        URL: '/api/consumer/profile'
     }
 };
 

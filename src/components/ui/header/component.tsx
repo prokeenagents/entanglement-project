@@ -40,7 +40,7 @@ export const Component: React.FC = () => {
                         </Text>
                     </VStack>
                     <Tooltip content="Account">
-                        <IconButton aria-label="Search database" variant="surface" size="xs">
+                        <IconButton aria-label="Account" variant="surface" size="xs" onClick={() => router.push('/user')}>
                             <FaRegUser />
                         </IconButton>
                     </Tooltip>

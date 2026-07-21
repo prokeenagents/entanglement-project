@@ -415,6 +415,48 @@ export default class KeenConsumer {
     }
 
     /**
+     * Read the logged-in consumer's own editable profile (name / gender / date of
+     * birth). Two-token GET — the read counterpart to `update`, used to PREFILL the
+     * account page. Returns the parsed envelope, or null when not connected / on error.
+     */
+    async getProfile(body: Keen.ConsumerProfileBody): Promise<Keen.ConsumerProfileReply | null> {
+        const resourceName = 'Consumer Profile';
+        const path = '/keen-api/consumer/profile';
+
+        try {
+            KeenValidator.validateToken(body.accessToken);
+
+            if (!this.KeenConnector.isReady) {
+                return null;
+            }
+
+            const url = `${this.KeenConnector.props.KEEN_HOST}${path}`;
+            const headers = new Headers();
+
+            headers.append('Origin', this.KeenConnector.props.ORIGIN);
+            headers.append('Authorization', `Bearer ${this.KeenConnector.token}`);
+            headers.append('X-Access-Token', body.accessToken);
+
+            const requestOptions = {
+                method: 'GET',
+                headers: headers,
+                redirect: 'follow'
+            } as RequestInit;
+
+            const result = await fetch(url, requestOptions);
+            const text = await result.text();
+            const data: unknown = JSON.parse(text);
+
+            console.log(`[keen] ${resourceName} → HTTP ${result.status}`);
+
+            return data as Keen.ConsumerProfileReply;
+        } catch (err) {
+            console.log(`[keen] ERROR: ${resourceName} → ${(err as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
      * List the logged-in consumer's active chats. Two-token call. Returns the
      * parsed chat envelope, or null when not connected / on error.
      */
