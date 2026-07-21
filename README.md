@@ -136,6 +136,81 @@ through `ConsumerProvider` (`src/contexts/consumer`). Client components read it
 with `useConsumer()` — no round-trip, no re-fetch. It's provided **once** at the
 `(app)` layout; nested layouts must not re-provide it.
 
+### Auth identity & the account page
+
+`(app)/layout.tsx` seeds two client contexts from the one server fetch:
+`ConsumerProvider` (spaces / agents / chat) and `AuthProvider`
+(`src/contexts/auth`), which holds the decoded token payload — the signed-in
+identity — as mutable state. The token is the source of truth: the provider
+re-seeds *during render* whenever the server re-renders the layout (a navigation or
+`router.refresh()`), using React's "reset state on a prop change" pattern rather
+than an effect, so a client-side patch lives only until the next server render.
+
+`useAuth()` exposes `{ identity, updateIdentity }`. `updateIdentity` patches the
+identity optimistically — the header shows a saved name the instant the `/user`
+page commits, without waiting for a round-trip — and the next server render
+reconciles it against the authoritative token.
+
+The `/user` account page (`(app)/user`) composes two forms:
+
+- **`ProfileForm`** edits first/last name, gender, and date of birth. The access
+  token doesn't carry those, so the page reads them server-side
+  (`GET /api/consumer/profile` → Keen's `GET /v1/consumer/profile`) to **prefill**,
+  and saves via `POST /api/consumer/update` as a **partial** update — a field left
+  blank is unchanged, not wiped. On success the connector re-mints the session
+  cookie (so the next render's token carries the new name) while
+  `updateIdentity({ username })` patches the header immediately. Email is the
+  account identity — shown, never editable here.
+- **`PasswordForm`** is a logged-in password change, and the CLAIM leg of a two-leg
+  flow: `POST /api/consumer/reset-password` (the live session is the proof of
+  identity — no current-password prompt) makes Keen email a confirm link to
+  `/confirm-password/<hash>`. Success here means "check your email", not "password
+  changed". That confirm page is a Server Component that opens the AES-256-GCM
+  **sealed** hash (purpose `reset-password`) and redeems it two-token, so nothing
+  sensitive ever touches the client.
+
+### Server→client events (long polling)
+
+Keen pushes org-side changes — a consumer deleted, its contract or its spaces
+changed — to the app as **webhooks**, but those land on the *server*, not in the
+user's browser. A long-poll channel bridges the gap so the right browser reacts.
+
+- **`EventBus`** (`src/service/events/event-bus.ts`) — an in-memory, per-process
+  singleton on `globalThis.__eventBus` (stashed like the Keen connector so it
+  survives dev HMR). `publish(key, event)` wakes every parked poll for that key or
+  queues the event when none is parked; `wait(key, timeoutMs)` parks until an event
+  arrives or the timeout elapses. **Keyed by consumer id**, so an event reaches only
+  its target. It's single-node: behind multiple instances a webhook on instance A
+  can't wake a poll parked on instance B — back it with shared pub/sub (Redis) to
+  scale out. Fine for the single-node boilerplate.
+- **`GET /api/events`** (`export const dynamic = 'force-dynamic'`) — the browser
+  holds this open. The route reads the caller's own consumer id (the access token's
+  verified `sub`), parks ~25s on that consumer's bus, then returns the events (or
+  `[]` on timeout so the client re-polls at once). Scoped to the token `sub`, a user
+  can only ever receive their *own* events — never force another user's browser.
+- **`EventsProvider` / `useEvents`** (`src/contexts/events`) — the RECEIVER, mounted
+  **once** in `(app)/layout.tsx`. It runs a single poll loop for the whole signed-in
+  session (`AbortController`, re-poll immediately on a normal return, ~3s backoff on
+  transport error, stop on 401) and fans each event out to component `subscribe()`rs
+  and then the global handler index.
+- **Handler index** (`handlers/index.ts`) — dispatch by `event.type`, one file per
+  handler. The `logout` handler re-checks `event.consumerId === userId`
+  (defense-in-depth — the bus already routed by id), then stops the loop, **awaits**
+  the logout POST (so `/login` can't bounce back on a still-present cookie), and
+  redirects. Add a reaction by extending `App.Events.Event`, dropping a handler file,
+  and registering it here.
+
+The webhook receiver (`src/app/api/keen-webhook/route.ts`) publishes a `logout`
+event scoped to `consumer.id` for the org instructions `r_consumer_logout` /
+`r_consumer_contract_changed` / `r_consumer_spaces_update`, so only the targeted
+consumer's browser signs out.
+
+**Why force-logout and not a soft refresh:** a consumer's entitlements — the spaces
+it may see — live in the access token's `space` claim, and there's no way to update
+that in place; only a fresh login re-mints the token. So when spaces or the contract
+change org-side, forcing a re-login is the reliable way to pick up the new
+entitlement.
+
 ### Chat
 
 A consumer talks to an agent over a **WebSocket to the Keen relay**, driven by the
@@ -177,6 +252,15 @@ The UI is `src/components/ui-chat`:
   answer is kept above it.
 - **Streaming cost is bounded** — the live `messages` array is a 50-item sliding
   window (FIFO), so a token in a long session costs no more than in a short one.
+
+**Managing chats** — the agent page (`space/[id]/[agentID]`) lists the consumer's
+chats: **Continue** resumes one, **Start new conversation** mints a fresh `chatID`,
+**double-clicking** a row's title renames it (`chat.setTitle`, committed on
+Enter/blur — a blank or unchanged value is a no-op so an untitled chat never saves
+its id as a title), and **Delete** archives it (soft-delete via `chat/delete`,
+owner-scoped upstream). Both edits are optimistic against a local copy of the
+server-fetched list, which already excludes archived chats, so the next mount agrees
+with no refresh.
 
 ### Styling
 

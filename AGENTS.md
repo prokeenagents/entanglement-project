@@ -102,6 +102,23 @@ rendering both parse **strings the engine emits** (`<SYSTEM CALL>…</SYSTEM CAL
 `" :: Canceled ::"`). They're a display convenience, not a contract — if the engine
 changes those markers, update the parser.
 
+## Server→client events: one provider, single-node bus, list the route
+
+The long-poll channel (`GET /api/events` ← `EventBus` ← `keen-webhook`) pushes
+org-side changes to the browser (today: force-logout). Three things bite:
+
+- `EventsProvider` (`src/contexts/events`) is mounted **once** in `(app)/layout.tsx`
+  — it holds ONE poll loop for the session. Don't mount a second.
+- `EventBus` is an in-memory `globalThis.__eventBus` singleton — **single-node**. A
+  webhook on one instance can't wake a poll parked on another; needs shared pub/sub
+  (Redis) to scale past one process.
+- Any new `/api/*` route must be registered in `AUTH_API_CONFIG` — the proxy **404s**
+  any `/api/*` path not listed there.
+
+Add a reaction by extending `App.Events.Event`, adding a handler file under
+`contexts/events/handlers/`, and registering it in that folder's `index.ts`. A
+handler compares `event.consumerId` to the current `userId` before acting.
+
 ## Secrets
 
 Keen credentials are read from the environment by `readKeenConfig()` in
