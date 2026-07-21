@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { getEventBus } from '@/service/events/event-bus';
+
 /**
  * Narrow the webhook's `result` to the { cert, key } material. Anything else —
  * the legacy bare-PEM string, a null, a partial object — is refused rather than
@@ -79,6 +81,26 @@ export async function POST(req: NextRequest) {
             if (instructions.includes('r_cert_delete')) {
                 globalThis.__keenConnector?.setActive(false);
                 globalThis.__keenConnector.setCertificate('');
+            }
+
+            // Consumer-targeted pushes — all three re-auth the consumer via a fresh
+            // login: account removed, contract changed, or spaces changed (the last
+            // because entitlements live in the token, so only a re-mint reflects them).
+            // The bus routes to that consumer's browser by id, and the event ALSO
+            // carries the id, so the handler acts only for the matching user.
+            const consumerId = body.consumer?.id;
+            if (consumerId) {
+                const reason = instructions.includes('r_consumer_logout')
+                    ? 'account removed'
+                    : instructions.includes('r_consumer_contract_changed')
+                      ? 'contract changed'
+                      : instructions.includes('r_consumer_spaces_update')
+                        ? 'spaces updated'
+                        : null;
+
+                if (reason) {
+                    getEventBus().publish(consumerId, { type: 'logout', consumerId, reason, at: Date.now() });
+                }
             }
         }
     } catch (err) {

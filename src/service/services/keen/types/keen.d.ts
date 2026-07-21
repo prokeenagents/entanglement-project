@@ -420,6 +420,12 @@ declare global {
                 'synch-data': string | string[];
                 result?: unknown;
                 type?: string;
+                /**
+                 * On a consumer-targeted push (e.g. `r_consumer_logout` when the org
+                 * removes an account), the affected consumer — its `id` routes the
+                 * event to that user's held long-poll.
+                 */
+                consumer?: { id: string };
             }
         }
     }

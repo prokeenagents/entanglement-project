@@ -63,6 +63,9 @@ export const AUTH_API_CONFIG = {
     },
     CONSUMER_RESET_PASSWORD: {
         URL: '/api/consumer/reset-password'
+    },
+    EVENTS: {
+        URL: '/api/events'
     }
 };
 

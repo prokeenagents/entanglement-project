@@ -2,6 +2,7 @@ import { getKeen } from '@/service/services/keen/keen';
 import KeenConnector from '@/service/services/keen/keen.connector';
 import { AuthProvider } from '@/contexts/auth';
 import { ConsumerProvider } from '@/contexts/consumer';
+import { EventsProvider } from '@/contexts/events';
 import { Suspense } from 'react';
 import { Header } from '@/components/ui/header';
 import { Footer } from '@/components/ui/footer';
@@ -38,10 +39,13 @@ async function ProviderShell(
     const consumerData = await keen.tools.getConsumerData();
 
     // AuthProvider owns the mutable IDENTITY (the token payload); ConsumerProvider
-    // owns the spaces / agents / chat. Both seed from the one server fetch.
+    // owns the spaces / agents / chat; EventsProvider is the long-poll RECEIVER
+    // (server→client push, e.g. force-logout). All seed from the one server fetch.
     return (
         <AuthProvider value={consumerData.tokenPayload}>
-            <ConsumerProvider value={consumerData}>{children}</ConsumerProvider>
+            <ConsumerProvider value={consumerData}>
+                <EventsProvider>{children}</EventsProvider>
+            </ConsumerProvider>
         </AuthProvider>
     );
 }
