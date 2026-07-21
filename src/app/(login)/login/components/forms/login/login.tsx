@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 
 import { formSchema, generateLoginHookFormPayload } from '@/@schema/login';
-import { Button, Field, HStack, Input, Stack, Text, VStack } from '@chakra-ui/react';
+import { Button, Field, HStack, Input, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { useLogin } from '@/hooks/login';
 import { LocalStorage } from '@/utils/localStorage';
 import { OTP_CONFIG } from '@/configs/otp.config';
@@ -140,6 +140,7 @@ export const Component: React.FC<{
                                 <Stack w="full" gap="2" justifyContent="center" align="center">
                                     <Field.Root invalid={!!errors.root}>
                                         <Button disabled={form.formState.isSubmitting || !isFormValid} type="submit" w="full">
+                                            {form.formState.isSubmitting && <Spinner size="sm" />}
                                             <Text as="span">Login</Text>
                                         </Button>
 

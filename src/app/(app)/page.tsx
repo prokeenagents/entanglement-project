@@ -5,5 +5,9 @@ import { HomeContent } from './content';
 // HERE and pass it down. Making this a client component would lose access to
 // getKeen() entirely — the connector never exists in the browser.
 export default async function Home() {
-    return <HomeContent />;
+    return (
+        <>
+            <HomeContent />
+        </>
+    );
 }

@@ -147,13 +147,95 @@ declare global {
             chatId: string;
         }
 
-        interface ConsumerChatReply {
-            success: boolean;
+        /** A chat as it appears in a list / search result. */
+        interface ChatListItem {
+            chatId: string;
+            /** Null until the chat has been titled. */
+            title: string | null;
+            agentId: string;
+            /** ISO-8601. */
+            createdAt: string;
+            /** ISO-8601. */
+            updatedAt: string;
+        }
+
+        /**
+         * One user-facing turn. The history surface returns only `initial = true`
+         * rows — sub-agent / tool calls are excluded — so each row is a whole
+         * exchange: the user's prompt AND the final answer.
+         */
+        interface ChatHistoryItem {
+            id: string;
+            prompt: string;
+            response: string;
+            responseType: 'text' | 'image' | 'tool' | 'error';
+            agentId: string;
+            /** ISO-8601. */
+            createdAt: string;
+        }
+
+        /**
+         * Pagination cursor. Round-trip `nextCursor` back as
+         * `before = "<createdAt>:<id>"` to fetch the next (older) page.
+         */
+        interface ChatCursor {
+            createdAt: string;
+            id: string;
+        }
+
+        interface ConsumerChatListData {
+            items: Keen.ChatListItem[];
+        }
+
+        interface ConsumerChatHistoryData {
+            items: Keen.ChatHistoryItem[];
+            /** Null when this is the last page. */
+            nextCursor: Keen.ChatCursor | null;
+        }
+
+        interface ConsumerSetChatTitleData {
+            chatId: string;
+            title: string;
+        }
+
+        interface ConsumerDeleteChatData {
+            chatId: string;
+            /** Always true — the delete is a soft archive. */
+            archived: boolean;
+        }
+
+        /** Success envelope — `data` is guaranteed present. */
+        interface ConsumerChatOk<T> {
+            success: true;
             status?: number;
             code?: string;
             message?: string;
-            data?: unknown;
+            data: T;
         }
+
+        /** Failure envelope — never carries `data`. */
+        interface ConsumerChatFail {
+            success: false;
+            status?: number;
+            code?: string;
+            message?: string;
+            data?: undefined;
+        }
+
+        /**
+         * The chat wire envelope, discriminated by `success` — narrow on it and
+         * `data` is fully typed with no optional chaining:
+         *
+         *     const res = await chat.list();
+         *     if (!res.success) return;
+         *     res.data.items;            // Keen.ChatListItem[]
+         */
+        type ConsumerChatReply<T = unknown> = Keen.ConsumerChatOk<T> | Keen.ConsumerChatFail;
+
+        type ConsumerChatListReply = Keen.ConsumerChatReply<Keen.ConsumerChatListData>;
+        type ConsumerChatHistoryReply = Keen.ConsumerChatReply<Keen.ConsumerChatHistoryData>;
+        type ConsumerSetChatTitleReply = Keen.ConsumerChatReply<Keen.ConsumerSetChatTitleData>;
+        type ConsumerDeleteChatReply = Keen.ConsumerChatReply<Keen.ConsumerDeleteChatData>;
 
         interface ExternalRegistrationClaimBody {
             firstName: string;

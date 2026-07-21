@@ -111,7 +111,7 @@ URL exactly and are prefix-allowed in `proxy-page-guest.ts` — `/set-password/`
 
 | Group | Purpose |
 | --- | --- |
-| `(app)` | Authenticated — home, `space/[id]`, `space/[id]/[agentID]` |
+| `(app)` | Authenticated — home, `space/[id]`, `space/[id]/[agentID]`, `space/[id]/[agentID]/[chatID]` (live chat) |
 | `(login)` | `login` (+ OTP), `reset-password`, `set-password/[hash]` |
 | `(registration)` | `registration`, `confirmation/[hash]` |
 | `(maintanance)` | Shown when the connector isn't ready |
@@ -119,7 +119,9 @@ URL exactly and are prefix-allowed in `proxy-page-guest.ts` — `/set-password/`
 
 `src/app/api/*` are Route Handlers — the only place the browser talks to the
 server about auth (`login`, `otp`, `logout`, `registration`, `reset-password`,
-`set-password`) plus the Keen `keen-webhook` / `keen-callback` receivers.
+`set-password`), the two-token `chat/*` proxies (`list`, `history`, `search`,
+`title`, `delete`) and `refresh`, plus the Keen `keen-webhook` / `keen-callback`
+receivers.
 
 ### Consumer context
 
@@ -127,6 +129,47 @@ server about auth (`login`, `otp`, `logout`, `registration`, `reset-password`,
 through `ConsumerProvider` (`src/contexts/consumer`). Client components read it
 with `useConsumer()` — no round-trip, no re-fetch. It's provided **once** at the
 `(app)` layout; nested layouts must not re-provide it.
+
+### Chat
+
+A consumer talks to an agent over a **WebSocket to the Keen relay**, driven by the
+raw-source SDK in `src/service/services/chat` — a port of the reference ChatSDK,
+not yet an npm package, so it's self-contained with zero project imports. `ChatAPI`
+sends the initial prompt, receives the root flow bundle, and drives every node —
+sequential, parallel, tool sub-flows — to a terminal state.
+
+- **Transport** is `CHAT_CONFIG.WS_URL` (`src/configs/chat.config.ts`). It must
+  point at the **same host the page is served on** — `localhost` in the browser is
+  the browser's machine, not the server — and use `ws://` on plain http, `wss://`
+  behind TLS. A bad origin is silently dropped by the relay's `OriginGuard` and
+  looks like a dead server (WS close 1006), never an auth error.
+- **The answer arrives on `onStream` `token` events**, not from `runFlow()`'s
+  return value (that resolves to the flow-tree snapshot, for inspection). Progress
+  events (`thinking` / `processing` / …) surface as their own rows so a long run
+  reads as progress rather than a frozen screen.
+- **Run with the agent SLUG** (`agent.agentId`), never the row id (a cuid) — the
+  relay rejects the cuid with `E3101`.
+- **One turn at a time** — a concurrent `runFlow` is rejected with "TaskQueue
+  already running", so the prompt gates Send on `running`.
+
+The UI is `src/components/ui-chat`:
+
+| Component | Role |
+| --- | --- |
+| `chat-shell` | Owns the `ChatAPI` lifecycle (effect + ref, never render); exposes `useChat()` → `{ chatID, status, running, messages, send, cancel }` |
+| `chat-messages` | Persisted history (last 50, one HTTP fetch) + this session's live turns |
+| `chat-prompt` | Textarea + Send / Cancel |
+
+- **Tool calls** — the orchestrator writes `<SYSTEM CALL>…</SYSTEM CALL>` into its
+  own token stream; `chat-messages/system-call.tsx` parses that fence into a
+  labelled chip. It renders what the LLM *wrote*, not whether the engine *accepted*
+  it — a view, not routing truth.
+- **Cancel** wipes the engine's state for the run (dict / session / agentState /
+  queue) via the relay cancel frame. A cancelled turn persists as
+  `"… :: Canceled ::"` and reloads as a quiet **Canceled.** row — any real partial
+  answer is kept above it.
+- **Streaming cost is bounded** — the live `messages` array is a 50-item sliding
+  window (FIFO), so a token in a long session costs no more than in a short one.
 
 ### Styling
 

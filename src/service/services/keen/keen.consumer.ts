@@ -418,7 +418,7 @@ export default class KeenConsumer {
      * List the logged-in consumer's active chats. Two-token call. Returns the
      * parsed chat envelope, or null when not connected / on error.
      */
-    async getChatList(body: Keen.ConsumerChatListBody): Promise<Keen.ConsumerChatReply | null> {
+    async getChatList(body: Keen.ConsumerChatListBody): Promise<Keen.ConsumerChatListReply | null> {
         const resourceName = 'Consumer Chat List';
         const path = '/keen-api/consumer/chat-list';
 
@@ -448,7 +448,7 @@ export default class KeenConsumer {
 
             console.log(`[keen] ${resourceName} → HTTP ${result.status}`);
 
-            return data as Keen.ConsumerChatReply;
+            return data as Keen.ConsumerChatListReply;
         } catch (err) {
             console.log(`[keen] ERROR: ${resourceName} → ${(err as Error).message}`);
             return null;
@@ -460,7 +460,7 @@ export default class KeenConsumer {
      * Two-token call; `query` is required, `limit` defaults to 150 server-side.
      * Returns the parsed chat envelope, or null when not connected / on error.
      */
-    async searchChats(body: Keen.ConsumerChatSearchBody): Promise<Keen.ConsumerChatReply | null> {
+    async searchChats(body: Keen.ConsumerChatSearchBody): Promise<Keen.ConsumerChatListReply | null> {
         const resourceName = 'Consumer Chat Search';
 
         try {
@@ -492,7 +492,7 @@ export default class KeenConsumer {
 
             console.log(`[keen] ${resourceName} → HTTP ${result.status}`);
 
-            return data as Keen.ConsumerChatReply;
+            return data as Keen.ConsumerChatListReply;
         } catch (err) {
             console.log(`[keen] ERROR: ${resourceName} → ${(err as Error).message}`);
             return null;
@@ -504,7 +504,7 @@ export default class KeenConsumer {
      * call; `limit` defaults to 50 server-side and `before` is a `<createdAt>:<id>`
      * cursor. Returns the parsed chat envelope, or null when not connected / on error.
      */
-    async getChatHistory(body: Keen.ConsumerChatHistoryBody): Promise<Keen.ConsumerChatReply | null> {
+    async getChatHistory(body: Keen.ConsumerChatHistoryBody): Promise<Keen.ConsumerChatHistoryReply | null> {
         const resourceName = 'Consumer Chat History';
 
         try {
@@ -537,7 +537,7 @@ export default class KeenConsumer {
 
             console.log(`[keen] ${resourceName} → HTTP ${result.status}`);
 
-            return data as Keen.ConsumerChatReply;
+            return data as Keen.ConsumerChatHistoryReply;
         } catch (err) {
             console.log(`[keen] ERROR: ${resourceName} → ${(err as Error).message}`);
             return null;
@@ -549,7 +549,7 @@ export default class KeenConsumer {
      * POSTs { title } to /keen-api/consumer/chat/:id/title. Returns the parsed
      * chat envelope, or null when not connected / on error.
      */
-    async setChatTitle(body: Keen.ConsumerSetChatTitleBody): Promise<Keen.ConsumerChatReply | null> {
+    async setChatTitle(body: Keen.ConsumerSetChatTitleBody): Promise<Keen.ConsumerSetChatTitleReply | null> {
         const resourceName = 'Consumer Set Chat Title';
 
         try {
@@ -586,7 +586,7 @@ export default class KeenConsumer {
 
             console.log(`[keen] ${resourceName} → HTTP ${result.status}`);
 
-            return data as Keen.ConsumerChatReply;
+            return data as Keen.ConsumerSetChatTitleReply;
         } catch (err) {
             console.log(`[keen] ERROR: ${resourceName} → ${(err as Error).message}`);
             return null;
@@ -598,7 +598,7 @@ export default class KeenConsumer {
      * body. The chat then vanishes from list/history. Returns the parsed chat
      * envelope, or null when not connected / on error.
      */
-    async deleteChat(body: Keen.ConsumerDeleteChatBody): Promise<Keen.ConsumerChatReply | null> {
+    async deleteChat(body: Keen.ConsumerDeleteChatBody): Promise<Keen.ConsumerDeleteChatReply | null> {
         const resourceName = 'Consumer Delete Chat';
 
         try {
@@ -630,7 +630,7 @@ export default class KeenConsumer {
 
             console.log(`[keen] ${resourceName} → HTTP ${result.status}`);
 
-            return data as Keen.ConsumerChatReply;
+            return data as Keen.ConsumerDeleteChatReply;
         } catch (err) {
             console.log(`[keen] ERROR: ${resourceName} → ${(err as Error).message}`);
             return null;

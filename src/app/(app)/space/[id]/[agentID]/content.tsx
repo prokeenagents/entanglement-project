@@ -2,7 +2,8 @@
 
 import { useConsumer } from '@/contexts/consumer';
 import { useLogin } from '@/hooks/login';
-import { Box, Button, Card, Container, Flex, For, Heading, HStack, Separator, Stack, Text, VStack } from '@chakra-ui/react';
+import { generateUUID } from '@/utils/global';
+import { Alert, Box, Button, Card, Container, Flex, For, Heading, HStack, Separator, Stack, Text, VStack } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -14,8 +15,9 @@ import { useRouter } from 'next/navigation';
 export const Content: React.FC<{
     spaceID: string;
     agentID: string;
+    chatList: Keen.ChatListItem[];
 }> = props => {
-    const { spaceID, agentID } = props;
+    const { spaceID, agentID, chatList } = props;
 
     const consumer = useConsumer();
     const spaces = consumer.consumerSpaces;
@@ -29,6 +31,15 @@ export const Content: React.FC<{
         router.push(`/space/${spaceID}`);
     };
 
+    const startNewChat = () => {
+        const chatID = generateUUID();
+        router.push(`/space/${spaceID}/${agentID}/${chatID}`);
+    };
+
+    const startChat = (chatID: string) => {
+        router.push(`/space/${spaceID}/${agentID}/${chatID}`);
+    };
+
     const space = spaces.find(s => s.id === spaceID);
 
     if (!space) {
@@ -40,28 +51,52 @@ export const Content: React.FC<{
         return <>There is no available agents in this space.</>;
     }
 
-    const agent = agents.filter(a => a.id === agentID);
-    if (!agent || !agent.length) {
+    const agent = agents.find(a => a.id === agentID);
+    if (!agent) {
         return <>This agent does not exists or you dont have access to it.</>;
     }
 
     return (
         <Container maxW="3xl" py={20}>
             <Stack gap={4}>
-                <Box>
-                    <Heading size="2xl" mb={2}>
-                        Entanglement
-                    </Heading>
-                    <Text color="fg.muted">Next.js 16 · React 19 · Chakra UI 3 · TypeScript</Text>
-                </Box>
-                <Separator w="full" />
                 <Button colorPalette="blue" onClick={() => navigateToSpaces()}>
                     Go to Spaces
                 </Button>
                 <Button colorPalette="blue" onClick={() => navigateToAgent()}>
                     Go to Space Agents
                 </Button>
-                Start
+
+                <Separator w="full" />
+
+                <Button colorPalette="blue" onClick={() => startNewChat()}>
+                    Start new conversation
+                </Button>
+
+                <Separator w="full" />
+
+                {!chatList.length && (
+                    <Alert.Root status="warning">
+                        <Alert.Indicator />
+                        <Alert.Title>
+                            No available chats with <strong>{agent.displayName}</strong>
+                        </Alert.Title>
+                    </Alert.Root>
+                )}
+
+                {chatList.length && (
+                    <>
+                        <VStack>
+                            {chatList.map(chat => {
+                                return (
+                                    <HStack key={chat.chatId}>
+                                        <Text>{chat.title || chat.chatId}</Text>
+                                        <Button onClick={() => startChat(chat.chatId)}>Continue</Button>
+                                    </HStack>
+                                );
+                            })}
+                        </VStack>
+                    </>
+                )}
             </Stack>
         </Container>
     );

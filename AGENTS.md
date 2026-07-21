@@ -79,6 +79,28 @@ Only Route Handlers and Server Actions can. A server page that needs to signal a
 one-time outcome uses a query flag (`/login?reset=success`) which the client
 captures into state and strips with `router.replace`.
 
+## Chat: WS host must match the page, run the agent SLUG
+
+The chat SDK (`src/service/services/chat`) talks to the Keen relay over a
+WebSocket. Two things bite:
+
+- `CHAT_CONFIG.WS_URL` must point at the **same host the page is served on**
+  (`localhost` in a browser is the browser's own machine) and match the scheme
+  (`ws://` on http, `wss://` on https). A wrong origin is **silently dropped** by
+  the relay — it looks like a dead server (WS close 1006), not an auth error.
+- Run with the agent **slug** (`agent.agentId`), never the row id (a cuid) — the
+  relay answers a cuid with `E3101`.
+
+The SDK is a self-contained raw-source port (destined to become an npm package):
+it has **zero project imports** — helpers like `generateUUID` are inlined, not
+pulled from `@/utils`. Keep it that way so it stays portable. `chat-shell` owns the
+`ChatAPI` in an effect + ref (never in render) and hands it down via `useChat()`.
+
+The tool-call chip (`chat-messages/system-call.tsx`) and the cancelled-row
+rendering both parse **strings the engine emits** (`<SYSTEM CALL>…</SYSTEM CALL>`,
+`" :: Canceled ::"`). They're a display convenience, not a contract — if the engine
+changes those markers, update the parser.
+
 ## Secrets
 
 `KEEN_CONFIG` in `src/service/services/keen/keen.ts` holds real dev credentials

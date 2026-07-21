@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { Button, Container, Heading, Stack, Text } from '@chakra-ui/react';
+import { Button, Heading, Separator, Text, VStack } from '@chakra-ui/react';
+import { Logo } from '@/components/ui/logo';
+import { ContentUI } from '@/components/ui/content';
 
 /**
  * Catch-all 404. `[...not_found]` matches every route not handled by a more
@@ -11,14 +13,30 @@ import { Button, Container, Heading, Stack, Text } from '@chakra-ui/react';
  */
 export default function Page() {
     return (
-        <Container maxW="3xl" py={20}>
-            <Stack gap={4} align="center" textAlign="center">
-                <Heading size="4xl">404</Heading>
-                <Text>This page could not be found.</Text>
-                <Button asChild>
-                    <Link href="/">Go home</Link>
-                </Button>
-            </Stack>
-        </Container>
+        <ContentUI minH="dvh" justifyContent="center">
+            <VStack gap="8">
+                <VStack gap="4">
+                    <Logo />
+                    <VStack gap="0" alignItems="center">
+                        <Text fontSize="sm" color="cyan.700" lineHeight="1.2">
+                            <strong>Entanglement</strong>
+                        </Text>
+                        <Text fontSize="xs" color="cyan.700" opacity="0.75" lineHeight="1.2">
+                            Project
+                        </Text>
+                    </VStack>
+
+                    <Separator w="full" />
+
+                    <VStack gap="1" alignItems="center" justifyContent="center">
+                        <Heading size="4xl">404</Heading>
+                        <Text>This page could not be found.</Text>
+                        <Button asChild>
+                            <Link href="/">Go home</Link>
+                        </Button>
+                    </VStack>
+                </VStack>
+            </VStack>
+        </ContentUI>
     );
 }

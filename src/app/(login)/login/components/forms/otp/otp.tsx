@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 
 import { formSchema, generateLoginOtpHookFormPayload } from '@/@schema/otp';
-import { Button, Field, HStack, PinInput, Progress, Stack, Text, VStack } from '@chakra-ui/react';
+import { Button, Field, HStack, PinInput, Progress, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { useLogin } from '@/hooks/login';
 import { LocalStorage } from '@/utils/localStorage';
 import { OTP_CONFIG } from '@/configs/otp.config';
@@ -163,14 +163,12 @@ export const Component: React.FC<{
                                 <HStack gap="4">
                                     <Field.Root invalid={!!errors.root}>
                                         <Button disabled={form.formState.isSubmitting || !isFormValid} type="submit">
+                                            {form.formState.isSubmitting && <Spinner size="sm" />}
                                             <Text as="span">Login</Text>
                                         </Button>
                                     </Field.Root>
 
                                     <Field.Root invalid={!!errors.root}>
-                                        {/* type="button" is load-bearing: a <button> inside a <form>
-                            defaults to type="submit", so without it Cancel would ALSO
-                            submit the PIN it is meant to discard. */}
                                         <Button type="button" disabled={form.formState.isSubmitting} onClick={onExpire}>
                                             <Text as="span">Cancel</Text>
                                         </Button>

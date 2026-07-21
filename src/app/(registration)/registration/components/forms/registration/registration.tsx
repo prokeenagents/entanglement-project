@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 
 import { formSchema, generateRegistrationHookFormPayload, toDob } from '@/@schema/registration';
-import { Box, Button, Field, Heading, HStack, Input, NativeSelect, Separator, Stack, Text, VStack } from '@chakra-ui/react';
+import { Box, Button, Field, Heading, HStack, Input, NativeSelect, Separator, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { PAGE_CONFIG } from '@/configs/page.config';
 import { useLogin } from '@/hooks/login';
 import { CardShell } from '@/components/ui/card-shell';
@@ -247,10 +247,10 @@ export const Component: React.FC = () => {
                             <Stack w="full" gap="2" justifyContent="center" align="center">
                                 <Field.Root invalid={!!errors.root}>
                                     <Button disabled={form.formState.isSubmitting || !isFormValid} type="submit" w="full">
+                                        {form.formState.isSubmitting && <Spinner size="sm" />}
                                         <Text as="span">Create account</Text>
                                     </Button>
 
-                                    {/* type="button": inside a <form> a button defaults to submit. */}
                                     <Button type="button" variant="plain" w="full" onClick={() => router.push(PAGE_CONFIG.LOGIN.URL)}>
                                         <Text as="span">Back to login</Text>
                                     </Button>

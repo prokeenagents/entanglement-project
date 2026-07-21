@@ -136,6 +136,27 @@ export default class KeenTools {
     }
 
     /**
+     * One ACTIVE agent out of the consumer's OWN entitled spaces, looked up by row
+     * id — the cuid the `[agentID]` route segment carries.
+     *
+     * Scoped through getConsumerData(), so an agent living in a space this consumer
+     * isn't entitled to is simply invisible — null, never a leak. Also null when
+     * there's no session, and null when the agent exists but is disabled: an
+     * inactive agent is unusable anyway (the relay refuses `active === false`), so
+     * it's treated as "not available" rather than surfaced.
+     *
+     * NB: the relay resolves a run's flow entry by the agent's SLUG, so hand the
+     * chat client `agent.agentId` (e.g. `offer-agent`) — NOT `agent.id`, the cuid
+     * you looked up with. Passing the cuid comes back as E3101 "agent not found in
+     * space".
+     */
+    async getAgentData(agentID: string): Promise<Keen.SpaceListCacheAgent | null> {
+        const { agents } = await this.getConsumerData();
+
+        return agents.find(agent => agent.id === agentID && agent.active) ?? null;
+    }
+
+    /**
      * Open the login OTP hash and return its contents. Unlike getTokenPayload this
      * is NOT a JWT — the OTP hash is a bare AES-GCM blob (`seal(..., 'otp')`), so
      * there is no signature to verify, just the symmetric open with this tenant's

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 
 import { formSchema, generateResetPasswordHookFormPayload } from '@/@schema/reset-password';
-import { Box, Button, Field, Heading, HStack, Input, Separator, Stack, Text, VStack } from '@chakra-ui/react';
+import { Box, Button, Field, Heading, HStack, Input, Separator, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { PAGE_CONFIG } from '@/configs/page.config';
 import { useLogin } from '@/hooks/login';
 import { Logo } from '@/components/ui/logo';
@@ -134,12 +134,10 @@ export const Component: React.FC = () => {
                                 <Stack w="full" gap="2" justifyContent="center" align="center">
                                     <Field.Root invalid={!!errors.root}>
                                         <Button disabled={form.formState.isSubmitting || !isFormValid} type="submit" w="full">
+                                            {form.formState.isSubmitting && <Spinner size="sm" />}
                                             <Text as="span">Submit</Text>
                                         </Button>
 
-                                        {/* type="button": inside a <form> a button defaults to
-                                    type="submit", so without it Go Back would fire a
-                                    reset claim on its way to the login page. */}
                                         <Button type="button" variant="plain" w="full" onClick={() => router.push(PAGE_CONFIG.LOGIN.URL)}>
                                             <Text as="span">Go Back</Text>
                                         </Button>
