@@ -103,9 +103,11 @@ changes those markers, update the parser.
 
 ## Secrets
 
-`KEEN_CONFIG` in `src/service/services/keen/keen.ts` holds real dev credentials
-(client secret, api_key secret). They're committed. Move them to env vars before
-this repo goes anywhere public.
+Keen credentials are read from the environment by `readKeenConfig()` in
+`src/service/services/keen/keen.ts` (`KEEN_*` — **server-only**, no
+`NEXT_PUBLIC_`). Real values go in `.env.local` (gitignored); `.env.example` is
+the committed template. Never put secrets in `next.config` (its `env` inlines them
+into the client bundle) or back in source.
 
 ## Git
 

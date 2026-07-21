@@ -181,10 +181,21 @@ injects via the stylesheet, and hydration fails. Don't remove it.
 
 ## Configuration
 
-Keen credentials currently live in `KEEN_CONFIG` in
-`src/service/services/keen/keen.ts` — host, origin, client id/secret, api_key
-id/secret.
+Keen credentials are read from the **environment** by `readKeenConfig()` in
+`src/service/services/keen/keen.ts`: `KEEN_HOST`, `KEEN_ORIGIN`, `KEEN_CLIENT_ID`,
+`KEEN_CLIENT_SECRET`, `KEEN_API_KEY_ID`, `KEEN_API_KEY_SECRET`. They're unprefixed
+(no `NEXT_PUBLIC_`), so they're **server-only** — Next never bundles them to the
+browser, which is what a client secret needs.
 
-> ⚠️ **These are real secrets in source.** They are dev credentials against a
-> local Keen edge, but committing them bakes them into git history. Move them to
-> environment variables before this repo is pushed anywhere public.
+Real values live in `.env.local` (gitignored — never committed); `.env.example`
+is the committed template of key names. To start:
+
+```bash
+cp .env.example .env.local   # then fill in the secrets
+```
+
+`readKeenConfig()` throws at startup if any var is missing, rather than
+authenticating with `undefined` and failing every request silently.
+
+> Don't move these into `next.config` — its `env` key string-inlines values into
+> the **client** bundle, which would ship the secrets to the browser.
