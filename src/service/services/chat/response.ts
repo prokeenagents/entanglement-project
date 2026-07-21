@@ -1,19 +1,11 @@
+import { CHAT_SETTINGS } from './settings';
+
 type Envelope = App.Chat.Envelope;
 type InboundFrame = App.Chat.InboundFrame;
 type ResponseHandler = App.Chat.ResponseHandler;
 type StreamEventHandler = App.Chat.StreamEventHandler;
 type ResponseAPIOptions = App.Chat.ResponseAPIOptions;
 type Unsubscribe = App.Chat.Unsubscribe;
-
-/**
- * How long waitFor() waits for a matching response envelope before
- * rejecting. On reject, TaskQueue.runRegularNode treats it like a
- * transient failure and RE-ISSUES the frame (sleep 1s → retry), which
- * is what fires a "new call" at the engine while you're paused at a
- * breakpoint. Bumped from 30s → 10min so a debug pause never trips
- * the retry. Drop back to 30_000 for normal load testing.
- */
-const DEFAULT_TIMEOUT_MS = 600_000;
 
 interface Pending {
     resolve: (envelope: Envelope) => void;
@@ -46,7 +38,7 @@ export default class ResponseAPI {
     private readonly streamHandlers = new Set<StreamEventHandler>();
 
     constructor(options: ResponseAPIOptions = {}) {
-        this.defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+        this.defaultTimeoutMs = options.defaultTimeoutMs ?? CHAT_SETTINGS.RESPONSE_TIMEOUT_MS;
     }
 
     /**

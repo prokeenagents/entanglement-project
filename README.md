@@ -138,7 +138,8 @@ not yet an npm package, so it's self-contained with zero project imports. `ChatA
 sends the initial prompt, receives the root flow bundle, and drives every node —
 sequential, parallel, tool sub-flows — to a terminal state.
 
-- **Transport** is `CHAT_CONFIG.WS_URL` (`src/configs/chat.config.ts`). It must
+- **Transport** is `CHAT_SETTINGS.WS_URL` (`src/service/services/chat/settings.ts`,
+  the SDK's default; override per call via `ChatAPIOptions.url`). It must
   point at the **same host the page is served on** — `localhost` in the browser is
   the browser's machine, not the server — and use `ws://` on plain http, `wss://`
   behind TLS. A bad origin is silently dropped by the relay's `OriginGuard` and

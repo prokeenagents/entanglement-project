@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import { CHAT_CONFIG } from '@/configs/chat.config';
 import { useConsumer } from '@/contexts/consumer';
 import ChatAPI from '@/service/services/chat';
 import { generateUUID } from '@/utils/global';
@@ -133,13 +132,12 @@ export const Component: React.FC<
          * re-render, and connect() has no WebSocket during SSR).
          */
         const instance = new ChatAPI({
-            url: CHAT_CONFIG.WS_URL,
             spaceID,
-            projectID: spaceID, // space id === project id
             agentID: agentSlugID, // the SLUG — the cuid comes back as E3101
             userId: userID,
             email,
             accessToken
+            // url defaults to CHAT_SETTINGS.WS_URL, projectID to spaceID — see chat/settings.ts
         });
 
         instance.onStatus(next => setStatus(next));

@@ -1,4 +1,5 @@
 import WSConnectAPI from './connect';
+import { CHAT_SETTINGS } from './settings';
 import { generateRequestId, sleep } from './utils';
 
 type OutboundFrame = App.Chat.OutboundFrame;
@@ -28,9 +29,6 @@ export type RunPayload = InitialRunPayload | NodeTaskRequest | ContextRunPayload
 export interface ExecuteOptions {
     maxRetries?: number;
 }
-
-const DEFAULT_MAX_RETRIES = 10;
-const DEFAULT_RETRY_DELAY_MS = 1000;
 
 /**
  * Reusable 'run' sender — one SendRequest per WSConnectAPI is the
@@ -63,8 +61,8 @@ export default class SendRequest {
         private readonly connection: WSConnectAPI,
         options: SendRequestOptions = {}
     ) {
-        this.defaultMaxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-        this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+        this.defaultMaxRetries = options.maxRetries ?? CHAT_SETTINGS.INITIAL_MAX_RETRIES;
+        this.retryDelayMs = options.retryDelayMs ?? CHAT_SETTINGS.RETRY_DELAY_MS;
         this.onAttempt = options.onAttempt;
     }
 

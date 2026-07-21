@@ -200,7 +200,12 @@ declare global {
              * ChatAPI when the user picks a different agent.
              */
             interface ChatAPIOptions {
-                url: string;
+                /**
+                 * Relay WebSocket endpoint. Optional — defaults to
+                 * CHAT_SETTINGS.WS_URL. Pass only to point at a different
+                 * relay per deployment.
+                 */
+                url?: string;
                 spaceID: string;
                 agentID: string;
                 /**
@@ -211,7 +216,11 @@ declare global {
                  */
                 userId: string;
                 email: string;
-                projectID: string;
+                /**
+                 * Optional — defaults to spaceID (space id === project id).
+                 * Pass only when they differ.
+                 */
+                projectID?: string;
                 /**
                  * User identity token. Sent ONCE inside the initial run
                  * payload (never in the WS URL — keeps it out of proxy

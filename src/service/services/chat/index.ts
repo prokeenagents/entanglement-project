@@ -1,5 +1,6 @@
 import ResponseAPI from './response';
 import SendRequest, { type ExecuteOptions } from './send-request';
+import { CHAT_SETTINGS } from './settings';
 import TaskQueue from './task-queue';
 import WSConnectAPI from './connect';
 
@@ -54,10 +55,14 @@ export default class ChatAPI {
         this.agentID = options.agentID;
         this.userId = options.userId;
         this.email = options.email;
-        this.projectID = options.projectID;
+        // Space id === project id — default projectID to spaceID when the caller
+        // doesn't pass one, so a run only has to name the space.
+        this.projectID = options.projectID ?? options.spaceID;
         this.accessToken = options.accessToken;
         this.responseApi = new ResponseAPI();
-        this.wsConnectApi = new WSConnectAPI(options.url, this.responseApi);
+        // url defaults to the SDK's configured relay endpoint (CHAT_SETTINGS.WS_URL);
+        // pass options.url only to point at a different relay per deployment.
+        this.wsConnectApi = new WSConnectAPI(options.url ?? CHAT_SETTINGS.WS_URL, this.responseApi);
         this.sendRequestApi = new SendRequest(this.wsConnectApi);
         this.taskQueue = new TaskQueue(this);
     }
@@ -168,7 +173,7 @@ export default class ChatAPI {
      * Throws if all retries fail.
      */
     async send(input: App.Chat.InitialRunPayload): Promise<string> {
-        const sent = await this.sendRequestApi.execute(input, { maxRetries: 10 });
+        const sent = await this.sendRequestApi.execute(input, { maxRetries: CHAT_SETTINGS.INITIAL_MAX_RETRIES });
 
         if (!sent.ok) {
             throw new Error(sent.error);

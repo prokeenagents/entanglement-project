@@ -1,4 +1,5 @@
 import type ChatAPI from './index';
+import { CHAT_SETTINGS } from './settings';
 import { generateRequestId, generateUUID, readBrowserCookies, sleep } from './utils';
 
 type NodeTask = App.Chat.NodeTask;
@@ -48,18 +49,6 @@ function bundleKey(flow: { correlationId: string; sessionId: string; flowId: str
  *   - any in-flight node processing checks the flag at every await
  *     boundary and bails out.
  */
-/**
- * Heartbeat cadence. Fires every 5s while a run() is in flight, refreshing
- * the engine's dict/session TTL via the 'ping' frame (→ SIGNAL:ENGINE:TOUCH
- * → dictionaryMgr/sessionMgr.touchAll). The engine TTL is 60s, so 5s
- * gives a 12× margin: a live flow survives a brief connection drop (up to
- * ~60s with no beat), while abandoned/finished state still reclaims within
- * ~a minute of the last beat. Independent of node latency — it keeps
- * firing even while a node is slow or retrying, so the flow can't expire
- * mid-run as long as the socket is alive.
- */
-const HEARTBEAT_INTERVAL_MS = 5_000;
-
 export default class TaskQueue {
     private readonly bundles = new Map<string, FlowTaskBundle>();
     private cancelled = false;
@@ -512,7 +501,7 @@ export default class TaskQueue {
          *      transport policy: bounded for initial, infinite for
          *      continuations.
          */
-        const maxResponseRetries = node.nodeContext.initial ? 10 : Number.POSITIVE_INFINITY;
+        const maxResponseRetries = node.nodeContext.initial ? CHAT_SETTINGS.INITIAL_MAX_RETRIES : Number.POSITIVE_INFINITY;
         let attempt = 0;
         let lastError: string | null = null;
 
@@ -534,7 +523,7 @@ export default class TaskQueue {
             let envelope: App.Chat.Envelope;
             try {
                 const requestId = await this.chat.sendNodeTask(payload, {
-                    maxRetries: node.nodeContext.initial ? 10 : Number.POSITIVE_INFINITY
+                    maxRetries: node.nodeContext.initial ? CHAT_SETTINGS.INITIAL_MAX_RETRIES : Number.POSITIVE_INFINITY
                 });
 
                 if (this.cancelled) {
@@ -550,7 +539,7 @@ export default class TaskQueue {
                 lastError = err instanceof Error ? err.message : String(err);
 
                 if (attempt < maxResponseRetries) {
-                    await sleep(1000);
+                    await sleep(CHAT_SETTINGS.RETRY_DELAY_MS);
                     continue;
                 }
 
@@ -683,7 +672,7 @@ export default class TaskQueue {
             lastError = `${envelope.code}: ${envelope.message ?? ''}`;
 
             if (attempt < maxResponseRetries) {
-                await sleep(1000);
+                await sleep(CHAT_SETTINGS.RETRY_DELAY_MS);
             }
         }
 
@@ -898,7 +887,7 @@ export default class TaskQueue {
          * a single fan-out won't self-reject. `completed` counts so
          * "1000 of 1000 ready" is observable.
          */
-        const BATCH = 15;
+        const BATCH = CHAT_SETTINGS.CONTEXT_BATCH_SIZE;
         let completed = 0;
 
         for (let start = 0; start < ids.length; start += BATCH) {
@@ -1283,7 +1272,7 @@ export default class TaskQueue {
 
         this.heartbeatTimer = setInterval(() => {
             this.chat.sendPing();
-        }, HEARTBEAT_INTERVAL_MS);
+        }, CHAT_SETTINGS.HEARTBEAT_INTERVAL_MS);
     }
 
     /**

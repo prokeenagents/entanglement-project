@@ -84,7 +84,8 @@ captures into state and strips with `router.replace`.
 The chat SDK (`src/service/services/chat`) talks to the Keen relay over a
 WebSocket. Two things bite:
 
-- `CHAT_CONFIG.WS_URL` must point at the **same host the page is served on**
+- `CHAT_SETTINGS.WS_URL` (`src/service/services/chat/settings.ts` — the SDK's
+  tunable defaults) must point at the **same host the page is served on**
   (`localhost` in a browser is the browser's own machine) and match the scheme
   (`ws://` on http, `wss://` on https). A wrong origin is **silently dropped** by
   the relay — it looks like a dead server (WS close 1006), not an auth error.
