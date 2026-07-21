@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+
 import { useConsumer } from '@/contexts/consumer';
-import { useLogin } from '@/hooks/login';
 import { generateUUID } from '@/utils/global';
-import { Alert, Box, Button, Card, Container, Flex, For, Heading, HStack, Separator, Stack, Text, VStack } from '@chakra-ui/react';
+import { Alert, Button, Card, Container, Editable, Heading, HStack, Separator, Stack, VStack } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -40,6 +41,68 @@ export const Content: React.FC<{
         router.push(`/space/${spaceID}/${agentID}/${chatID}`);
     };
 
+    /**
+     * Local, optimistic copy of the server-fetched chat list so a delete drops the
+     * row immediately. The server list already excludes archived chats, so on the
+     * next mount this state and the server agree — no refresh needed.
+     */
+    const [chats, setChats] = useState(chatList);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    /**
+     * Archive a chat (soft-delete, owner-scoped upstream). Optimistic: on success
+     * drop the row; on failure keep it and surface the reason.
+     */
+    const deleteChat = async (chatId: string) => {
+        setDeletingId(chatId);
+        setError(null);
+
+        try {
+            const reply = await consumer.chat.delete(chatId);
+
+            if (reply.success) {
+                setChats(prev => prev.filter(c => c.chatId !== chatId));
+            } else {
+                setError(reply.message ?? 'Could not delete the chat.');
+            }
+        } catch {
+            setError('Could not delete the chat.');
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    /**
+     * Persist a renamed title (double-click → edit → commit on Enter/blur). No-op
+     * when blank or unchanged from what's shown — the Editable's fallback preview is
+     * the chatId, so committing an untouched untitled chat must NOT save the id as a
+     * title. Optimistic: update local state on success so the new title sticks.
+     */
+    const renameChat = async (chatId: string, rawTitle: string) => {
+        const title = rawTitle.trim();
+        const current = chats.find(c => c.chatId === chatId);
+        const shown = current?.title || chatId;
+
+        if (!title || title === shown) {
+            return;
+        }
+
+        setError(null);
+
+        try {
+            const reply = await consumer.chat.setTitle(chatId, title);
+
+            if (reply.success) {
+                setChats(prev => prev.map(c => (c.chatId === chatId ? { ...c, title } : c)));
+            } else {
+                setError(reply.message ?? 'Could not rename the chat.');
+            }
+        } catch {
+            setError('Could not rename the chat.');
+        }
+    };
+
     const space = spaces.find(s => s.id === spaceID);
 
     if (!space) {
@@ -74,7 +137,14 @@ export const Content: React.FC<{
 
                 <Separator w="full" />
 
-                {!chatList.length && (
+                {error && (
+                    <Alert.Root status="error">
+                        <Alert.Indicator />
+                        <Alert.Title>{error}</Alert.Title>
+                    </Alert.Root>
+                )}
+
+                {!chats.length && (
                     <Alert.Root status="warning">
                         <Alert.Indicator />
                         <Alert.Title>
@@ -83,15 +153,37 @@ export const Content: React.FC<{
                     </Alert.Root>
                 )}
 
-                {chatList.length && (
+                {chats.length > 0 && (
                     <>
-                        <VStack>
-                            {chatList.map(chat => {
+                        <Heading>Chat List</Heading>
+                        <VStack w="full">
+                            {chats.map(chat => {
                                 return (
-                                    <HStack key={chat.chatId}>
-                                        <Text>{chat.title || chat.chatId}</Text>
-                                        <Button onClick={() => startChat(chat.chatId)}>Continue</Button>
-                                    </HStack>
+                                    <Card.Root key={chat.chatId} w="full" size="sm">
+                                        <Card.Body>
+                                            <HStack>
+                                                {/* Double-click the title to rename; Enter/blur commits → setTitle. */}
+                                                <Editable.Root
+                                                    flex="1"
+                                                    defaultValue={chat.title || chat.chatId}
+                                                    activationMode="dblclick"
+                                                    onValueCommit={details => void renameChat(chat.chatId, details.value)}
+                                                >
+                                                    <Editable.Preview />
+                                                    <Editable.Input />
+                                                </Editable.Root>
+                                                <Button onClick={() => startChat(chat.chatId)}>Continue</Button>
+                                                <Button
+                                                    colorPalette="red"
+                                                    variant="outline"
+                                                    loading={deletingId === chat.chatId}
+                                                    onClick={() => void deleteChat(chat.chatId)}
+                                                >
+                                                    Delete
+                                                </Button>
+                                            </HStack>
+                                        </Card.Body>
+                                    </Card.Root>
                                 );
                             })}
                         </VStack>
