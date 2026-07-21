@@ -18,13 +18,13 @@ That's the only import.
 import ChatAPI from './api';
 
 const chat = new ChatAPI({
-    url:         'ws://localhost:5520/ws',
     spaceID:     'test-space',
     agentID:     'agent-one',
     userId:      'cmnbrajfm0000mz7wd39jj0r9',
-    email:       'paskal@keenagents.ai',
-    projectID:   'your-project-id',   // a REAL deployed project id — no default
+    email:       'consumer@example.com',
     accessToken: '<consumer-jwt>'   // a REAL consumer access_token (verified per message)
+    // url defaults to CHAT_SETTINGS.WS_URL, projectID defaults to spaceID — see settings.ts.
+    // Pass url only to target a different relay; pass projectID only when it != spaceID.
 });
 
 chat.connect();
@@ -49,13 +49,13 @@ One full conversation turn. The rest of this doc explains each step and what to 
 
 ```ts
 const chat = new ChatAPI({
-    url:         'ws://localhost:5520/ws',
     spaceID:     'test-space',
     agentID:     'agent-one',
     userId:      'cmnbrajfm0000mz7wd39jj0r9',
-    email:       'paskal@keenagents.ai',
-    projectID:   'your-project-id',   // a REAL deployed project id — no default
+    email:       'consumer@example.com',
     accessToken: '<consumer-jwt>'   // a REAL consumer access_token (verified per message)
+    // url defaults to CHAT_SETTINGS.WS_URL, projectID defaults to spaceID — see settings.ts.
+    // Pass url only to target a different relay; pass projectID only when it != spaceID.
 });
 ```
 
@@ -63,15 +63,15 @@ const chat = new ChatAPI({
 
 | Option | What it does |
 |---|---|
-| `url` | The relay WebSocket endpoint |
+| `url` | *Optional.* The relay WebSocket endpoint. Defaults to `CHAT_SETTINGS.WS_URL` (`settings.ts`); pass only to target a different relay |
 | `spaceID` | Space identifier (no per-call override) |
 | `agentID` | **Default** agent — used by `runFlow()` when the per-call `agentId` is omitted |
 | `userId` | **Default** user id — fills `userContext.userId` when the per-call `userId` is omitted. **MUST equal the access_token's `sub`** — the relay enforces it per message |
 | `email` | **Default** user email — fills `userContext.email` when the per-call `email` is omitted; should match the consumer the token was minted for |
-| `projectID` | **Default** project — sourced into `chatContext.projectId`. Must be a **real deployed project id**: the engine loads the project's flow JSON from `…/storage/projects/<projectId>/`, so there is **no default** — pass an id that actually exists on the engine |
+| `projectID` | *Optional.* Sourced into `chatContext.projectId`; **defaults to `spaceID`** (space id === project id). Pass only when they differ. Must be a **real deployed project id** — the engine loads the flow JSON from `…/storage/projects/<projectId>/`, so the id (or the `spaceID` it falls back to) must actually exist on the engine |
 | `accessToken` | Consumer identity token (a real JWT, not a placeholder). Travels inside `userContext` and is **re-stamped on every run frame** — initial run + continuations + cloned children — because the relay verifies it **per message** (`verifyWithChain`) and enforces `token.sub === userId`. Never in the URL. Mint it via `POST /keen-api/auth/access_token` (consumer email + password + the matching `Origin` header). |
 
-`spaceID` / `agentID` / `userId` / `email` / `projectID` / `accessToken` are set ONCE at construction. Five of them (`agentID` / `userId` / `email` / `projectID` — but NOT `spaceID` or `accessToken`) act as **defaults** that can be overridden on individual `runFlow()` calls. The defaults are also exposed as readonly fields on the instance (`chat.userId`, `chat.email`, `chat.projectID`, `chat.spaceID`, `chat.agentID`) so downstream UI / logging can read them without threading them through. To switch space or refresh the token, construct a new `ChatAPI` (and disconnect the old one). You hold this reference for the lifetime of the user's chat. Don't recreate it per message.
+`url` and `projectID` are **optional** at construction — `url` defaults to `CHAT_SETTINGS.WS_URL` (`settings.ts`, the SDK's tunable constants) and `projectID` to `spaceID`. The identity fields `spaceID` / `agentID` / `userId` / `email` / `accessToken` are set ONCE. Four of them (`agentID` / `userId` / `email` / `projectID` — but NOT `spaceID` or `accessToken`) act as **defaults** that can be overridden on individual `runFlow()` calls. The defaults are also exposed as readonly fields on the instance (`chat.userId`, `chat.email`, `chat.projectID`, `chat.spaceID`, `chat.agentID`) so downstream UI / logging can read them without threading them through. To switch space or refresh the token, construct a new `ChatAPI` (and disconnect the old one). You hold this reference for the lifetime of the user's chat. Don't recreate it per message.
 
 ## Step 2 — Wire lifecycle subscriptions
 
