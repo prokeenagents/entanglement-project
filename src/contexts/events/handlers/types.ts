@@ -20,4 +20,15 @@ export interface EventHandlerContext {
     userId: string | undefined;
 }
 
-export type EventHandler = (event: App.Events.Event, context: EventHandlerContext) => void | Promise<void>;
+/**
+ * A handler for ONE event type. Generic so the index can bind each entry to its own
+ * member of the union — the `logout` handler is handed a `LogoutEvent` and can read
+ * `consumerId` without narrowing, and a handler registered under the wrong key is a
+ * compile error rather than a runtime surprise.
+ */
+export type EventHandler<TEvent extends App.Events.Event = App.Events.Event> = (event: TEvent, context: EventHandlerContext) => void | Promise<void>;
+
+/** The handler index's shape: each `type` maps to a handler for exactly that event. */
+export type EventHandlerMap = {
+    [TType in App.Events.Event['type']]?: EventHandler<Extract<App.Events.Event, { type: TType }>>;
+};

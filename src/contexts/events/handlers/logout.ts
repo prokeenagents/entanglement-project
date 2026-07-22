@@ -11,7 +11,7 @@ import type { EventHandler } from './types';
  * on a still-present cookie. `router` + `stop` come from the events context, not
  * module scope.
  */
-export const logout: EventHandler = async (event, { router, stop, userId }) => {
+export const logout: EventHandler<App.Events.LogoutEvent> = async (event, { router, stop, userId }) => {
     // Only sign out the consumer this event targets. The bus already routes it to
     // the matching browser (keyed by consumer id), so this is a belt-and-suspenders
     // check on the payload — if it isn't us, ignore it.

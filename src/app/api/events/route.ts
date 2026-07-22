@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getEventBus } from '@/service/events/event-bus';
+import { GLOBAL_EVENT_KEY, getEventBus } from '@/service/events/event-bus';
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken } from '@/utils/cookies';
 
@@ -11,8 +11,11 @@ import { getAccessToken } from '@/utils/cookies';
  * for this consumer (an org→site webhook lands → the bus wakes the poll), or after
  * ~25s with an empty list so the client immediately re-polls.
  *
- * Scoped to the caller's OWN consumer id (the access token's verified `sub`), so a
- * user can only ever receive their own events — never force another user's browser.
+ * Two channels, one poll: the caller's OWN consumer id (the access token's verified
+ * `sub`) for targeted pushes, plus the broadcast key for org-wide changes. Targeted
+ * events still can't cross users — the key is derived from the verified token, never
+ * from the request — while the broadcast key carries only what is safe for everyone
+ * (a "spaces changed, re-read them" ping, no payload).
  *
  * Registered in AUTH_API_CONFIG — the proxy 404s any /api/* path not listed there.
  */
@@ -35,7 +38,7 @@ export async function GET() {
         return NextResponse.json({ events: [] }, { status: 401 });
     }
 
-    const events = await getEventBus().wait(consumerId, POLL_TIMEOUT_MS);
+    const events = await getEventBus().waitAny([consumerId, GLOBAL_EVENT_KEY], POLL_TIMEOUT_MS);
 
     return NextResponse.json({ events });
 }

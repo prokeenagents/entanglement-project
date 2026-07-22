@@ -16,6 +16,14 @@
  */
 export type BusEvent = App.Events.Event;
 
+/**
+ * The BROADCAST key. Events published here are for every signed-in browser, not one
+ * consumer — org-wide config changes (spaces / agents) rather than per-user pushes.
+ * It is a reserved key: consumer ids are cuids, so it can never collide with one.
+ * Every parked poll waits on this key IN ADDITION to its own consumer key.
+ */
+export const GLOBAL_EVENT_KEY = 'global_info';
+
 type Waiter = (events: BusEvent[]) => void;
 
 export class EventBus {
@@ -25,8 +33,9 @@ export class EventBus {
     private readonly waiters = new Map<string, Set<Waiter>>();
 
     /**
-     * Deliver an event to a key (a consumer id). Wakes EVERY parked poll for that key
-     * (so all their open tabs react), or queues it when none is parked.
+     * Deliver an event to a key — a consumer id for a targeted push, or
+     * GLOBAL_EVENT_KEY for a broadcast. Wakes EVERY parked poll for that key (so all
+     * their open tabs react), or queues it when none is parked.
      */
     publish(key: string, event: BusEvent): void {
         const parked = this.waiters.get(key);
@@ -50,11 +59,26 @@ export class EventBus {
      * proxies anyway, so we return empty well inside those limits.
      */
     wait(key: string, timeoutMs: number): Promise<BusEvent[]> {
-        const queued = this.queues.get(key);
+        return this.waitAny([key], timeoutMs);
+    }
 
-        if (queued && queued.length > 0) {
-            this.queues.delete(key);
-            return Promise.resolve(queued);
+    /**
+     * Park on SEVERAL keys at once — a poll waits on its own consumer key AND the
+     * broadcast key — resolving on the first event from any of them.
+     *
+     * One waiter attached to every key, detached from ALL of them the moment it
+     * settles. Racing N separate `wait()` calls instead would leave the losers parked
+     * until their own timeout, so each re-poll would pile another orphan onto the
+     * broadcast key for up to a full poll window.
+     */
+    waitAny(keys: string[], timeoutMs: number): Promise<BusEvent[]> {
+        for (const key of keys) {
+            const queued = this.queues.get(key);
+
+            if (queued && queued.length > 0) {
+                this.queues.delete(key);
+                return Promise.resolve(queued);
+            }
         }
 
         return new Promise<BusEvent[]>(resolve => {
@@ -67,14 +91,20 @@ export class EventBus {
 
                 settled = true;
                 clearTimeout(timer);
-                this.detach(key, waiter);
+
+                for (const key of keys) {
+                    this.detach(key, waiter);
+                }
+
                 resolve(events);
             };
 
             const waiter: Waiter = events => finish(events);
             const timer = setTimeout(() => finish([]), timeoutMs);
 
-            this.attach(key, waiter);
+            for (const key of keys) {
+                this.attach(key, waiter);
+            }
         });
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getEventBus } from '@/service/events/event-bus';
+import { GLOBAL_EVENT_KEY, getEventBus } from '@/service/events/event-bus';
 
 /**
  * Narrow the webhook's `result` to the { cert, key } material. Anything else —
@@ -60,6 +60,24 @@ export async function POST(req: NextRequest) {
 
         if (body['synch-data'] && Array.isArray(body['synch-data'])) {
             const instructions = body['synch-data'] as Array<string>;
+
+            // Org-wide config changed: a space was mutated, or one of its agents was.
+            // Re-read the list into the connector cache FIRST, then tell every open
+            // browser — publishing before the fetch settles would have them re-render
+            // off the stale cache and miss the very change we're announcing.
+            //
+            // Broadcast, not targeted: spaces + agents are the same for everyone, and
+            // the event carries no payload — just "re-read them".
+            if (instructions.includes('r_space') || instructions.includes('r_agent')) {
+                await globalThis.__keenConnector?.resources.getSpaceList();
+
+                getEventBus().publish(GLOBAL_EVENT_KEY, {
+                    type: 'space-change',
+                    reason: instructions.includes('r_agent') ? 'agent updated' : 'space updated',
+                    at: Date.now()
+                });
+            }
+
             if (instructions.includes('r_api_keys')) {
                 globalThis.__keenConnector?.reconnect();
             }
