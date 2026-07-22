@@ -131,8 +131,9 @@ export default class KeenTools {
         const tokenPayload = accessToken ? await this.getTokenPayload(accessToken) : null;
         const consumerSpaces = this.getConsumerSpaces(tokenPayload);
         const agents = consumerSpaces.flatMap(space => space.agents ?? []);
+        const wsUrl = process.env.KEEN_WS;
 
-        return { accessToken, refreshToken, tokenPayload, consumerSpaces, agents };
+        return { accessToken, refreshToken, tokenPayload, consumerSpaces, agents, wsUrl };
     }
 
     /**

@@ -33,7 +33,7 @@ export const CHAT_SETTINGS = {
      * The browser's Origin must be allow-listed on the api_key, or OriginGuard
      * destroys the upgrade socket and the WS closes 1006 with no explanation.
      */
-    WS_URL: 'ws://192.168.68.120:5520/ws',
+    WS_URL: 'ws://localhost/ws-keen',
 
     /**
      * How long ResponseAPI.waitFor() waits for a matching response envelope before

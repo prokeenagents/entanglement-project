@@ -136,7 +136,8 @@ export const Component: React.FC<
             agentID: agentSlugID, // the SLUG — the cuid comes back as E3101
             userId: userID,
             email,
-            accessToken
+            accessToken,
+            url: consumer.wsUrl
             // url defaults to CHAT_SETTINGS.WS_URL, projectID to spaceID — see chat/settings.ts
         });
 

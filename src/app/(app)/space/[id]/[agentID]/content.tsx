@@ -173,12 +173,7 @@ export const Content: React.FC<{
                                                     <Editable.Input />
                                                 </Editable.Root>
                                                 <Button onClick={() => startChat(chat.chatId)}>Continue</Button>
-                                                <Button
-                                                    colorPalette="red"
-                                                    variant="outline"
-                                                    loading={deletingId === chat.chatId}
-                                                    onClick={() => void deleteChat(chat.chatId)}
-                                                >
+                                                <Button colorPalette="red" variant="outline" loading={deletingId === chat.chatId} onClick={() => void deleteChat(chat.chatId)}>
                                                     Delete
                                                 </Button>
                                             </HStack>

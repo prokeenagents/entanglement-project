@@ -393,6 +393,7 @@ declare global {
             tokenPayload: Keen.AccessTokenPayload | null;
             consumerSpaces: Keen.SpaceListCacheResult[];
             agents: Keen.SpaceListCacheAgent[];
+            wsUrl?: string;
         }
 
         namespace Webhook {
