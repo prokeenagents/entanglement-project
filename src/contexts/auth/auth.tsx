@@ -1,6 +1,8 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+
+import { API_CONFIG } from '@/configs/api.config';
 
 /**
  * The signed-in consumer's IDENTITY (the access-token payload) as mutable client
@@ -34,7 +36,55 @@ export function AuthProvider({ value, children }: { value: App.Auth.Identity | n
         setIdentity(prev => (prev ? { ...prev, ...patch } : prev));
     }, []);
 
-    const context = useMemo<App.Auth.ContextValue>(() => ({ identity, updateIdentity }), [identity, updateIdentity]);
+    /**
+     * A rotation SPENDS the refresh token (the relay swaps it in its allow-list), so
+     * two rotations in flight at once would send the second with an already-spent
+     * token and get a bogus 401. Callers fire this from independent processes, so
+     * they share one in-flight request instead of racing.
+     */
+    const inFlight = useRef<Promise<string | null> | null>(null);
+
+    /**
+     * Rotate the session via POST /api/refresh — the ONLY place that can do it, since
+     * rotating needs the refresh_token, which is httpOnly and server-readable only.
+     * The relay decides whether a rotation is actually due: when the current token
+     * still has life it answers with its "still valid" fast-path and no new pair is
+     * minted, so this is cheap to call unconditionally. Either way the route hands
+     * back a token that is good right now (and re-mints the cookies when it rotated).
+     */
+    const checkAndRefreshToken = useCallback(async (): Promise<string | null> => {
+        if (inFlight.current) {
+            return inFlight.current;
+        }
+
+        const run = (async (): Promise<string | null> => {
+            try {
+                const res = await fetch(API_CONFIG.REFRESH.URL, { method: 'POST', cache: 'no-store' });
+                const data = (await res.json()) as { success?: boolean; accessToken?: string };
+
+                if (!res.ok || data.success !== true || !data.accessToken) {
+                    return null;
+                }
+
+                return data.accessToken;
+            } catch {
+                // Transport failure — indistinguishable from a dead session to the
+                // caller, and both mean "don't keep using the old token".
+                return null;
+            }
+        })().finally(() => {
+            inFlight.current = null;
+        });
+
+        inFlight.current = run;
+
+        return run;
+    }, []);
+
+    const context = useMemo<App.Auth.ContextValue>(
+        () => ({ identity, updateIdentity, checkAndRefreshToken }),
+        [identity, updateIdentity, checkAndRefreshToken]
+    );
 
     return <AuthContext.Provider value={context}>{children}</AuthContext.Provider>;
 }

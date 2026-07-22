@@ -15,6 +15,13 @@ declare global {
                  * next server render re-seeds from the authoritative token.
                  */
                 updateIdentity: (patch: Partial<Identity>) => void;
+                /**
+                 * Rotate the session and hand back a live access token — call it from any
+                 * long-running client process before it uses the token, since the one it
+                 * started with may have expired in the meantime. Resolves to the fresh
+                 * token, or `null` when the session is genuinely over (bounce to /login).
+                 */
+                checkAndRefreshToken: () => Promise<string | null>;
             }
         }
     }
