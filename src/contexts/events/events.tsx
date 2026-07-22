@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { API_CONFIG } from '@/configs/api.config';
 import { useAuth } from '@/contexts/auth';
+import { useNotice } from '@/contexts/notice';
 
 import { busHandler } from './handlers';
 
@@ -44,6 +45,7 @@ const RETRY_DELAY_MS = 3000;
 export function EventsProvider({ children }: React.PropsWithChildren) {
     const router = useRouter();
     const { identity } = useAuth();
+    const notice = useNotice();
     const userId = identity?.sub;
     const handlers = useRef<Set<EventHandler>>(new Set());
 
@@ -92,6 +94,7 @@ export function EventsProvider({ children }: React.PropsWithChildren) {
                         await busHandler(event, {
                             router,
                             userId,
+                            notice,
                             stop: () => {
                                 stopped = true;
                             }
@@ -119,7 +122,8 @@ export function EventsProvider({ children }: React.PropsWithChildren) {
             stopped = true;
             controller.abort();
         };
-    }, [router, userId]);
+        // `notice` is a stable memo from NoticeProvider, so it never restarts the loop.
+    }, [router, userId, notice]);
 
     const value = useMemo<EventsContextValue>(() => ({ subscribe }), [subscribe]);
 

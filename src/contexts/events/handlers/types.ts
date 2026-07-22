@@ -18,6 +18,11 @@ export interface EventHandlerContext {
      * for the current user.
      */
     userId: string | undefined;
+    /**
+     * Raise the app's blocking notice dialog. A handler is a plain function with no
+     * render of its own, so this is how it says something to the user.
+     */
+    notice: App.Notice.ContextValue;
 }
 
 /**

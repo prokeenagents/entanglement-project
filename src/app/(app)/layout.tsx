@@ -3,6 +3,7 @@ import KeenConnector from '@/service/services/keen/keen.connector';
 import { AuthProvider } from '@/contexts/auth';
 import { ConsumerProvider } from '@/contexts/consumer';
 import { EventsProvider } from '@/contexts/events';
+import { NoticeProvider } from '@/contexts/notice';
 import { Suspense } from 'react';
 import { Header } from '@/components/ui/header';
 import { Footer } from '@/components/ui/footer';
@@ -41,10 +42,15 @@ async function ProviderShell(
     // AuthProvider owns the mutable IDENTITY (the token payload); ConsumerProvider
     // owns the spaces / agents / chat; EventsProvider is the long-poll RECEIVER
     // (server→client push, e.g. force-logout). All seed from the one server fetch.
+    //
+    // NoticeProvider sits ABOVE EventsProvider on purpose: the events loop hands
+    // `notice.show` to every handler, so the dialog must already be mounted.
     return (
         <AuthProvider value={consumerData.tokenPayload}>
             <ConsumerProvider value={consumerData}>
-                <EventsProvider>{children}</EventsProvider>
+                <NoticeProvider>
+                    <EventsProvider>{children}</EventsProvider>
+                </NoticeProvider>
             </ConsumerProvider>
         </AuthProvider>
     );
