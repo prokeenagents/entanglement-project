@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
                 getEventBus().publish(GLOBAL_EVENT_KEY, {
                     type: 'space-change',
-                    reason: instructions.includes('r_agent') ? 'agent updated' : 'space updated',
+                    resource: instructions.includes('r_agent') ? 'agent' : 'space',
                     at: Date.now()
                 });
             }

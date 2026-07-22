@@ -40,6 +40,12 @@ declare global {
              */
             interface SpaceChangeEvent extends BaseEvent {
                 type: 'space-change';
+                /**
+                 * WHICH of the two mutated — `r_space` or `r_agent`. A discrete field
+                 * rather than something parsed back out of `reason`, so a handler can
+                 * branch on it without depending on human-readable wording.
+                 */
+                resource: 'space' | 'agent';
             }
 
             /**
