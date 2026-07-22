@@ -372,7 +372,7 @@ declare global {
             updatedAt: string;
             displayName: string;
             agentId: string;
-            template: string;
+            jsonSettings: string;
             startFlow: string;
             startNode: string;
             active: boolean;
