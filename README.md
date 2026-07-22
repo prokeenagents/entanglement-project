@@ -146,10 +146,31 @@ re-seeds *during render* whenever the server re-renders the layout (a navigation
 `router.refresh()`), using React's "reset state on a prop change" pattern rather
 than an effect, so a client-side patch lives only until the next server render.
 
-`useAuth()` exposes `{ identity, updateIdentity }`. `updateIdentity` patches the
-identity optimistically — the header shows a saved name the instant the `/user`
-page commits, without waiting for a round-trip — and the next server render
-reconciles it against the authoritative token.
+`useAuth()` exposes `{ identity, updateIdentity, checkAndRefreshToken }`.
+`updateIdentity` patches the identity optimistically — the header shows a saved name
+the instant the `/user` page commits, without waiting for a round-trip — and the next
+server render reconciles it against the authoritative token.
+
+`checkAndRefreshToken()` resolves to a live access token, or `null` when the session
+is genuinely over. It **cannot** be purely client-side: both tokens are httpOnly
+cookies and `getTokenPayload` opens an AES seal server-side, so the browser can
+neither read the refresh token nor decode `exp`. So it POSTs `/api/refresh`, which
+reads the httpOnly refresh cookie, calls `keen.consumer.rotateToken()`, re-mints the
+cookies, and returns the fresh token — including the relay's `statusCode: 100`
+"still valid" fast path, where nothing is re-minted and the current token is handed
+back. The relay decides whether a rotation is due, so this is cheap to call
+unconditionally.
+
+It also holds an **in-flight guard**: a rotation *spends* the refresh token (the relay
+swaps it in its allow-list), so two concurrent calls would send an already-spent one
+and take a false 401 — a spurious logout. Concurrent callers share one request.
+
+`ChatShell` calls it on a **5-minute interval** while a chat is open and pushes the
+result onto the live client with `setAccessToken()` — no reconnect, since the socket
+is bound to the cid, not the token. It ticks whenever a client exists rather than
+only while a turn is running: an idle thread is exactly the case that would otherwise
+start its next send with `E3002`. A `null` is left alone — clearing the token would
+turn a recoverable state into a broken one; the logout event owns the sign-out path.
 
 The `/user` account page (`(app)/user`) composes two forms:
 
@@ -179,31 +200,57 @@ user's browser. A long-poll channel bridges the gap so the right browser reacts.
   singleton on `globalThis.__eventBus` (stashed like the Keen connector so it
   survives dev HMR). `publish(key, event)` wakes every parked poll for that key or
   queues the event when none is parked; `wait(key, timeoutMs)` parks until an event
-  arrives or the timeout elapses. **Keyed by consumer id**, so an event reaches only
-  its target. It's single-node: behind multiple instances a webhook on instance A
-  can't wake a poll parked on instance B — back it with shared pub/sub (Redis) to
-  scale out. Fine for the single-node boilerplate.
+  arrives or the timeout elapses. Keys are **a consumer id** for a targeted event, or
+  the reserved **`GLOBAL_EVENT_KEY`** (`'global_info'`) for a broadcast — consumer ids
+  are cuids, so the reserved key can never collide with one. `waitAny(keys[], ms)`
+  parks on several keys with ONE waiter, detached from all of them on settle; racing
+  two `wait()` calls instead would leave the loser parked, piling an orphan onto the
+  broadcast key on every re-poll. It's single-node: behind multiple instances a
+  webhook on instance A can't wake a poll parked on instance B — back it with shared
+  pub/sub (Redis) to scale out. Fine for the single-node boilerplate.
 - **`GET /api/events`** (`export const dynamic = 'force-dynamic'`) — the browser
   holds this open. The route reads the caller's own consumer id (the access token's
-  verified `sub`), parks ~25s on that consumer's bus, then returns the events (or
-  `[]` on timeout so the client re-polls at once). Scoped to the token `sub`, a user
-  can only ever receive their *own* events — never force another user's browser.
+  verified `sub`) and parks ~25s on **both** that consumer's key and the broadcast
+  key, then returns the events (or `[]` on timeout so the client re-polls at once).
+  Targeted events still can't cross users — the key comes from the verified token,
+  never the request — while the broadcast key carries only what is safe for everyone
+  (a "spaces changed, re-read them" ping with no payload).
 - **`EventsProvider` / `useEvents`** (`src/contexts/events`) — the RECEIVER, mounted
   **once** in `(app)/layout.tsx`. It runs a single poll loop for the whole signed-in
   session (`AbortController`, re-poll immediately on a normal return, ~3s backoff on
   transport error, stop on 401) and fans each event out to component `subscribe()`rs
   and then the global handler index.
 - **Handler index** (`handlers/index.ts`) — dispatch by `event.type`, one file per
-  handler. The `logout` handler re-checks `event.consumerId === userId`
-  (defense-in-depth — the bus already routed by id), then stops the loop, **awaits**
-  the logout POST (so `/login` can't bounce back on a still-present cookie), and
-  redirects. Add a reaction by extending `App.Events.Event`, dropping a handler file,
-  and registering it here.
+  handler. `App.Events.Event` is a **discriminated union** (`LogoutEvent`, targeted +
+  carrying `consumerId`; `SpaceChangeEvent`, global + carrying `resource`), and the
+  index is keyed by type to the matching member — so registering a handler under the
+  wrong key is a compile error. The `logout` handler re-checks
+  `event.consumerId === userId` (defense-in-depth — the bus already routed by id),
+  then stops the loop, **awaits** the logout POST (so `/login` can't bounce back on a
+  still-present cookie), and redirects. The `space-change` handler raises the notice
+  dialog and is **not** terminal — it neither stops the loop nor navigates, so a user
+  mid-conversation stays put. Add a reaction by extending `App.Events.Event`, dropping
+  a handler file, and registering it here.
 
 The webhook receiver (`src/app/api/keen-webhook/route.ts`) publishes a `logout`
 event scoped to `consumer.id` for the org instructions `r_consumer_logout` /
 `r_consumer_contract_changed` / `r_consumer_spaces_update`, so only the targeted
-consumer's browser signs out.
+consumer's browser signs out. (Note: Keen specifies `r_consumer_logout` but does not
+currently emit it — the branch is here and simply never fires.)
+
+For `r_space` / `r_agent` — a space, or one of the agents in it, was mutated org-side
+— the receiver **awaits `getSpaceList()` before publishing** a global `space-change`
+event: announcing first would have every browser re-render off the still-stale
+connector cache and miss the very change being announced.
+
+**The notice dialog.** `space-change` surfaces through `NoticeProvider`
+(`src/contexts/notice`), which owns the one blocking dialog and hands out `show()`.
+It's a context because the caller isn't a component — an event handler is a plain
+function with no render of its own — so `notice` rides the handler context next to
+`router` / `stop` / `userId`, and the provider is mounted **above** `EventsProvider`.
+The dialog is closable **only by the X or OK** (`closeOnInteractOutside` and
+`closeOnEscape` both off — Chakra defaults them on), and a second `show()` replaces
+the current notice rather than queueing.
 
 **Why force-logout and not a soft refresh:** a consumer's entitlements — the spaces
 it may see — live in the access token's `space` claim, and there's no way to update
@@ -219,12 +266,23 @@ not yet an npm package, so it's self-contained with zero project imports. `ChatA
 sends the initial prompt, receives the root flow bundle, and drives every node —
 sequential, parallel, tool sub-flows — to a terminal state.
 
-- **Transport** is `CHAT_SETTINGS.WS_URL` (`src/service/services/chat/settings.ts`,
-  the SDK's default; override per call via `ChatAPIOptions.url`). It must
-  point at the **same host the page is served on** — `localhost` in the browser is
-  the browser's machine, not the server — and use `ws://` on plain http, `wss://`
-  behind TLS. A bad origin is silently dropped by the relay's `OriginGuard` and
-  looks like a dead server (WS close 1006), never an auth error.
+- **Transport** is `KEEN_WS` when set, threaded server→client as `consumer.wsUrl`
+  and passed as `ChatAPIOptions.url`; otherwise `CHAT_SETTINGS.WS_URL`
+  (`src/service/services/chat/settings.ts`, the SDK's default). It must point at the
+  **relay's own reachable address** — `localhost` in the browser is the browser's
+  machine, not the server — and match the scheme (`ws://` on plain http, `wss://`
+  behind TLS). Behind nginx the public path is `/ws-keen`.
+- **The WS host does NOT have to be the page's host.** The `Origin` header on a
+  WebSocket upgrade is the **page's** origin, not the `wss://` host — so what the
+  relay's `OriginGuard` allow-lists is wherever the page is served from (which should
+  equal `KEEN_ORIGIN`). A working combination in practice: the page served through a
+  tunnel while `KEEN_WS` points straight at the sandbox's own domain. A non-allow-listed
+  origin is silently dropped and looks like a dead server (WS close 1006), never an
+  auth error.
+- **Don't put a browser WebSocket through a free ngrok tunnel.** It forwards HTTPS
+  fine but 503s the upgrade — a browser WS can't send `ngrok-skip-browser-warning`.
+  Point `KEEN_WS` at the relay's real domain and leave the tunnel for inbound
+  webhooks.
 - **The answer arrives on `onStream` `token` events**, not from `runFlow()`'s
   return value (that resolves to the flow-tree snapshot, for inspection). Progress
   events (`thinking` / `processing` / …) surface as their own rows so a long run
@@ -274,7 +332,9 @@ injects via the stylesheet, and hydration fails. Don't remove it.
 
 Keen credentials are read from the **environment** by `readKeenConfig()` in
 `src/service/services/keen/keen.ts`: `KEEN_HOST`, `KEEN_ORIGIN`, `KEEN_CLIENT_ID`,
-`KEEN_CLIENT_SECRET`, `KEEN_API_KEY_ID`, `KEEN_API_KEY_SECRET`. They're unprefixed
+`KEEN_CLIENT_SECRET`, `KEEN_API_KEY_ID`, `KEEN_API_KEY_SECRET`, plus the optional
+`KEEN_WS` (the chat WebSocket endpoint — falls back to `CHAT_SETTINGS.WS_URL` when
+unset). They're unprefixed
 (no `NEXT_PUBLIC_`), so they're **server-only** — Next never bundles them to the
 browser, which is what a client secret needs.
 

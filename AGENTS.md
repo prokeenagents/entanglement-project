@@ -84,11 +84,15 @@ captures into state and strips with `router.replace`.
 The chat SDK (`src/service/services/chat`) talks to the Keen relay over a
 WebSocket. Two things bite:
 
-- `CHAT_SETTINGS.WS_URL` (`src/service/services/chat/settings.ts` — the SDK's
-  tunable defaults) must point at the **same host the page is served on**
-  (`localhost` in a browser is the browser's own machine) and match the scheme
-  (`ws://` on http, `wss://` on https). A wrong origin is **silently dropped** by
-  the relay — it looks like a dead server (WS close 1006), not an auth error.
+- The endpoint is `KEEN_WS` when set (threaded as `consumer.wsUrl` →
+  `ChatAPIOptions.url`), else `CHAT_SETTINGS.WS_URL`. It must point at the **relay's
+  own reachable address** (`localhost` in a browser is the browser's own machine) and
+  match the scheme (`ws://` on http, `wss://` on https) — but it does **not** have to
+  be the page's host: the WS `Origin` header is the PAGE origin, so the allow-list
+  entry is wherever the page is served from. A non-allow-listed origin is **silently
+  dropped** by the relay — it looks like a dead server (WS close 1006), not an auth
+  error. A free ngrok tunnel cannot carry a browser WS upgrade at all (503); point
+  `KEEN_WS` at the real domain.
 - Run with the agent **slug** (`agent.agentId`), never the row id (a cuid) — the
   relay answers a cuid with `E3101`.
 
@@ -105,7 +109,8 @@ changes those markers, update the parser.
 ## Server→client events: one provider, single-node bus, list the route
 
 The long-poll channel (`GET /api/events` ← `EventBus` ← `keen-webhook`) pushes
-org-side changes to the browser (today: force-logout). Three things bite:
+org-side changes to the browser (today: force-logout, and a space/agent change
+notice). Five things bite:
 
 - `EventsProvider` (`src/contexts/events`) is mounted **once** in `(app)/layout.tsx`
   — it holds ONE poll loop for the session. Don't mount a second.
@@ -113,11 +118,22 @@ org-side changes to the browser (today: force-logout). Three things bite:
   webhook on one instance can't wake a poll parked on another; needs shared pub/sub
   (Redis) to scale past one process.
 - Any new `/api/*` route must be registered in `AUTH_API_CONFIG` — the proxy **404s**
-  any `/api/*` path not listed there.
+  any `/api/*` path not listed there. (`/api/refresh` is deliberately in
+  `GUEST_API_CONFIG`: it is called precisely WHEN the access token has expired, so
+  listing it as authenticated would 404 it in the one state it exists to fix.)
+- A **global** event publishes to `GLOBAL_EVENT_KEY`, not a consumer id, and every
+  poll parks on both keys via `waitAny` — one waiter across both, so nothing is left
+  orphaned when one fires. Only put on that key what is safe for every signed-in
+  user: a signal to re-read, never a payload.
+- `NoticeProvider` must stay mounted **above** `EventsProvider` — the loop hands
+  `notice` to every handler, so the dialog has to exist before the first event lands.
 
 Add a reaction by extending `App.Events.Event`, adding a handler file under
-`contexts/events/handlers/`, and registering it in that folder's `index.ts`. A
-handler compares `event.consumerId` to the current `userId` before acting.
+`contexts/events/handlers/`, and registering it in that folder's `index.ts`. The
+union is discriminated and the index is keyed by type to the matching member, so a
+handler registered under the wrong key won't compile. A **targeted** handler compares
+`event.consumerId` to the current `userId` before acting; a global one has no
+`consumerId` to compare.
 
 ## Secrets
 
