@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
+import { useAuth } from '@/contexts/auth';
 import { useConsumer } from '@/contexts/consumer';
 import ChatAPI from '@/service/services/chat';
 import { generateUUID } from '@/utils/global';
@@ -55,6 +56,18 @@ const MAX_MESSAGES = 50;
 const CANCELLED_MESSAGE = 'TaskQueue cancelled';
 
 /**
+ * How often a live chat rotates its access token. A chat session outlives the
+ * token — the socket is bound to the cid, not the token, so a thread left open
+ * would eventually start failing every send with E3002. Ticking well inside the
+ * token's lifetime keeps a fresh one on the instance before that can happen.
+ *
+ * Cheap by design: when the current token still has life the relay answers with
+ * its "still valid" fast-path and mints nothing, so most ticks cost one request
+ * and change nothing.
+ */
+const TOKEN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
  * Append a message, keeping only the last MAX_MESSAGES — drop the oldest when the
  * 51st arrives. This is what bounds the streaming cost: setMessages' array copy
  * and the list's reconcile walk can never exceed MAX_MESSAGES, so a token in a
@@ -98,6 +111,7 @@ export const Component: React.FC<
 > = props => {
     const { consumerData, chatID, spaceID, agentID, children } = props;
     const consumer = useConsumer();
+    const { checkAndRefreshToken } = useAuth();
 
     const email = consumerData.tokenPayload?.email;
     const userID = consumerData.tokenPayload?.sub;
@@ -209,6 +223,35 @@ export const Component: React.FC<
             chatRef.current?.setAccessToken(accessToken);
         }
     }, [accessToken]);
+
+    /**
+     * Keep the token alive for as long as this chat is open. The server prop above
+     * only changes on a server re-render, which a long-lived chat thread never
+     * triggers on its own — so without this the token would simply age out under a
+     * connected socket.
+     *
+     * Ticks only when there IS a live client (no identity = no instance = nothing
+     * to keep alive), and lands the result the same way the prop does: straight
+     * onto the instance, no reconnect. A null means the session is genuinely over;
+     * there is nothing useful to do with it here, so leave the stale token in place
+     * and let the next send surface the failure — the logout event handler owns the
+     * sign-out path.
+     */
+    useEffect(() => {
+        const timer = setInterval(() => {
+            if (!chatRef.current) {
+                return;
+            }
+
+            void checkAndRefreshToken().then(token => {
+                if (token) {
+                    chatRef.current?.setAccessToken(token);
+                }
+            });
+        }, TOKEN_REFRESH_INTERVAL_MS);
+
+        return () => clearInterval(timer);
+    }, [checkAndRefreshToken]);
 
     /**
      * One conversation turn. The same chatID is passed every time so the engine
