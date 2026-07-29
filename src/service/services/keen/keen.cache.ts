@@ -4,6 +4,8 @@ export default class KeenCache {
     private googleConnect: unknown = null;
     private spaceList: unknown = null;
     private consumerContract: Keen.ConsumerContractResponse | null = null;
+    /** Per-agent Front Settings (raw JSON string, '' = none), keyed by agent SLUG. Lazily filled, refreshed by the webhook. */
+    private frontSettings = new Map<string, string>();
 
     constructor(private KeenConnector: KeenConnector) {}
 
@@ -48,5 +50,28 @@ export default class KeenCache {
      */
     getConsumerContract(): Keen.ConsumerContractResponse | null {
         return this.consumerContract;
+    }
+
+    /**
+     * Store one agent's Front Settings JSON ('' means "agent has none").
+     */
+    setAgentFrontSettings(agentId: string, jsonSettings: string) {
+        this.frontSettings.set(agentId, jsonSettings);
+    }
+
+    /**
+     * Return the cached Front Settings for one agent, or null if never fetched —
+     * null tells the caller to fetch, '' tells it the agent HAS no settings.
+     */
+    getAgentFrontSettings(agentId: string): string | null {
+        return this.frontSettings.has(agentId) ? (this.frontSettings.get(agentId) as string) : null;
+    }
+
+    /**
+     * The agent slugs currently held — the webhook refresh re-fetches exactly
+     * these (the agents this site actually uses), never the whole org.
+     */
+    getAgentFrontSettingsKeys(): string[] {
+        return [...this.frontSettings.keys()];
     }
 }

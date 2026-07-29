@@ -78,6 +78,21 @@ export async function POST(req: NextRequest) {
                 });
             }
 
+            // An agent's partner-facing Front Settings changed. Notify-then-fetch:
+            // re-read the settings for every agent this site has actually used (the
+            // connector cache keys) BEFORE announcing, so handlers and pages read the
+            // fresh values, not the stale cache. The webhook body carries no agent id
+            // by convention — the fetch leg is the source of truth.
+            if (instructions.includes('r_agent_front_settings')) {
+                const agentIds = globalThis.__keenConnector?.cache.getAgentFrontSettingsKeys() ?? [];
+                await Promise.allSettled(agentIds.map(agentId => globalThis.__keenConnector?.resources.getAgentFrontSettings(agentId)));
+
+                getEventBus().publish(GLOBAL_EVENT_KEY, {
+                    type: 'agent-front-settings-change',
+                    at: Date.now()
+                });
+            }
+
             if (instructions.includes('r_api_keys')) {
                 globalThis.__keenConnector?.reconnect();
             }

@@ -4,6 +4,7 @@ import KeenResources from './keen.resources';
 import KeenExternal from './keen.external';
 import KeenTools from './keen.tools';
 import KeenCache from './keen.cache';
+import KeenFrontSettings from './keen.front-settings';
 import { seal as sealPayload, open as openPayload } from './keen.crypto';
 
 export default class KeenConnector {
@@ -25,6 +26,7 @@ export default class KeenConnector {
     private External: KeenExternal;
     private Tools: KeenTools;
     private Cache: KeenCache;
+    private FrontSettings: KeenFrontSettings;
 
     constructor(private PROPS: Keen.Connector) {
         this.authorization = this.getAuthorization();
@@ -33,6 +35,7 @@ export default class KeenConnector {
         this.External = new KeenExternal(this);
         this.Tools = new KeenTools(this);
         this.Cache = new KeenCache(this);
+        this.FrontSettings = new KeenFrontSettings(this);
     }
 
     /** The application_token fetched at boot. Empty string until getApplicationToken succeeds. */
@@ -100,6 +103,11 @@ export default class KeenConnector {
 
     get resources(): KeenResources {
         return this.Resources;
+    }
+
+    /** Value-level Front Settings reads — the partner-side mirror of system/settings (get / getMany / has). */
+    get frontSettings(): KeenFrontSettings {
+        return this.FrontSettings;
     }
 
     get external(): KeenExternal {

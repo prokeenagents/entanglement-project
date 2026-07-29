@@ -135,6 +135,21 @@ handler registered under the wrong key won't compile. A **targeted** handler com
 `event.consumerId` to the current `userId` before acting; a global one has no
 `consumerId` to compare.
 
+## Front Settings: read by field name, cache-first
+
+Per-agent partner config ("Front Agent Settings") arrives via the
+`r_agent_front_settings` webhook and is read with
+`globalThis.__keenConnector.frontSettings.get(agentId, fieldId)` /
+`getMany(agentId, ...ids)` / `has(agentId, fieldId)` — server-only, like the rest
+of the connector. There is deliberately no `all()`: name the fields you consume so
+grep finds every dependency. Rows with `valid: false` are skipped; `''` means the
+agent has none; reads never throw (broken blob → `undefined`). The webhook
+receiver re-fetches every CACHED agent slug **before** publishing the
+`agent-front-settings-change` event — handlers may read immediately. Browser code
+goes through `GET /api/agent-front-settings?agentId=` (listed in
+`AUTH_API_CONFIG`). Don't confuse this with the agent's runtime Json Settings —
+that channel belongs to Keen's script engine and never reaches this site.
+
 ## Secrets
 
 Keen credentials are read from the environment by `readKeenConfig()` in

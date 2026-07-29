@@ -1,3 +1,4 @@
+import { agentFrontSettingsChange } from './agent-front-settings-change';
 import { logout } from './logout';
 import { spaceChange } from './space-change';
 import type { EventHandler, EventHandlerContext, EventHandlerMap } from './types';
@@ -11,7 +12,8 @@ import type { EventHandler, EventHandlerContext, EventHandlerMap } from './types
  */
 const handlers: EventHandlerMap = {
     logout,
-    'space-change': spaceChange
+    'space-change': spaceChange,
+    'agent-front-settings-change': agentFrontSettingsChange
 };
 
 /**

@@ -222,7 +222,8 @@ user's browser. A long-poll channel bridges the gap so the right browser reacts.
   and then the global handler index.
 - **Handler index** (`handlers/index.ts`) — dispatch by `event.type`, one file per
   handler. `App.Events.Event` is a **discriminated union** (`LogoutEvent`, targeted +
-  carrying `consumerId`; `SpaceChangeEvent`, global + carrying `resource`), and the
+  carrying `consumerId`; `SpaceChangeEvent`, global + carrying `resource`;
+  `AgentFrontSettingsChangeEvent`, global, payload-free), and the
   index is keyed by type to the matching member — so registering a handler under the
   wrong key is a compile error. The `logout` handler re-checks
   `event.consumerId === userId` (defense-in-depth — the bus already routed by id),
@@ -237,6 +238,43 @@ event scoped to `consumer.id` for the org instructions `r_consumer_logout` /
 `r_consumer_contract_changed` / `r_consumer_spaces_update`, so only the targeted
 consumer's browser signs out. (Note: Keen specifies `r_consumer_logout` but does not
 currently emit it — the branch is here and simply never fires.)
+
+### Agent Front Settings (org → partner config)
+
+Each Keen agent carries a partner-facing config blob — **Front Agent Settings** —
+edited org-side (ms-ui) as rows of `{fieldId, fieldType, required, valid, value}`.
+It is the partner twin of the agent's runtime settings: the org's script engine
+never sees THIS channel, and this site never sees the runtime one.
+
+Delivery is **notify-then-fetch**. A save org-side fires the
+`r_agent_front_settings` webhook (no payload); the receiver re-fetches the
+settings for **every agent slug this site has actually used** (the connector
+cache's keys) via the relay's tenancy-scoped
+`GET /keen-api/resources/agent-front-settings?agentId=<slug>` — scoped by Keen to
+agents inside THIS partner's contract spaces — and only THEN publishes the global
+`agent-front-settings-change` event, so anything reading from here on sees the new
+values, never the stale cache.
+
+Reading a value — **always by field name**, server-side via the connector:
+
+```ts
+const keen = globalThis.__keenConnector;
+const welcome = await keen.frontSettings.get('unimasters-chat', 'welcome-message');
+const [a, b] = await keen.frontSettings.getMany('unimasters-chat', 'title', 'theme');
+const ok = await keen.frontSettings.has('unimasters-chat', 'theme');
+```
+
+`keen.frontSettings` (`src/service/services/keen/keen.front-settings.ts`) is
+cache-first with a self-priming miss (fetch → cache; afterwards the webhook keeps
+that agent fresh), skips rows stamped `valid: false` (saved before passing
+validation — same rule Keen's own engine applies), treats `''` as "agent has no
+settings", and never throws — a broken or unavailable blob reads as `undefined`.
+There is deliberately **no `all()`**: naming every consumed field keeps each
+dependency greppable before the org renames one. Browser components read through
+`GET /api/agent-front-settings?agentId=<slug>` (session-gated, registered in
+`AUTH_API_CONFIG`) and get the raw `jsonSettings` string. The cache is in-memory
+on the connector (single-node, like the event bus): a process restart just costs
+one re-fetch on the next read.
 
 For `r_space` / `r_agent` — a space, or one of the agents in it, was mutated org-side
 — the receiver **awaits `getSpaceList()` before publishing** a global `space-change`

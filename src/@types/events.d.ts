@@ -49,11 +49,25 @@ declare global {
             }
 
             /**
+             * `agent-front-settings-change` — an agent's partner-facing Front
+             * Settings were saved org-side (the `r_agent_front_settings` webhook).
+             * The receiver has ALREADY re-fetched the fresh values into the
+             * connector cache before publishing, so a handler (or a page reading
+             * /api/agent-front-settings) sees the new state immediately.
+             *
+             * GLOBAL: front settings are org-wide partner configuration — the same
+             * for every signed-in browser, nobody to target.
+             */
+            interface AgentFrontSettingsChangeEvent extends BaseEvent {
+                type: 'agent-front-settings-change';
+            }
+
+            /**
              * A server→client event delivered down the long-poll channel
              * (GET /api/events). Extend the union as more push events are needed —
              * each `type` gets its own handler file under contexts/events/handlers.
              */
-            type Event = LogoutEvent | SpaceChangeEvent;
+            type Event = LogoutEvent | SpaceChangeEvent | AgentFrontSettingsChangeEvent;
         }
     }
 }

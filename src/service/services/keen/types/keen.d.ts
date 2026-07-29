@@ -372,11 +372,28 @@ declare global {
             updatedAt: string;
             displayName: string;
             agentId: string;
-            jsonSettings: string;
             startFlow: string;
             startNode: string;
             active: boolean;
             spaceId: string;
+            /** The record travels LIGHT — settings existence only; the blobs live on their own channels. */
+            hasSettings?: boolean;
+        }
+
+        /**
+         * GET /keen-api/resources/agent-front-settings?agentId=<slug> — the partner
+         * fetch leg of the `r_agent_front_settings` webhook (notify-then-fetch).
+         * `jsonSettings` is the raw JSON string ('' = no settings). Tenancy-scoped
+         * by the relay to agents inside THIS partner's contract spaces.
+         */
+        interface AgentFrontSettingsResponse {
+            success: boolean;
+            status: number;
+            message: string;
+            result?: {
+                agentId: string;
+                jsonSettings: string;
+            };
         }
 
         /**

@@ -66,6 +66,9 @@ export const AUTH_API_CONFIG = {
     },
     EVENTS: {
         URL: '/api/events'
+    },
+    AGENT_FRONT_SETTINGS: {
+        URL: '/api/agent-front-settings'
     }
 };
 

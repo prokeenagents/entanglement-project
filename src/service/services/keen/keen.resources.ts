@@ -104,6 +104,60 @@ export default class KeenResources {
     }
 
     /**
+     * Fetch one agent's Front Settings (application-token resource) — the fetch
+     * leg of the `r_agent_front_settings` webhook. The relay scopes the read to
+     * agents inside THIS partner's contract spaces; ms-space serves it from the
+     * Dragonfly front channel. Returns the raw JSON string ('' = no settings),
+     * false on a refused/non-JSON response, or null when not connected / on a
+     * transport error. Successful reads land in the connector cache.
+     */
+    async getAgentFrontSettings(agentId: string) {
+        const resourceName = 'Agent Front Settings';
+        const path = `/keen-api/resources/agent-front-settings?agentId=${encodeURIComponent(agentId)}`;
+
+        try {
+            if (!this.KeenConnector.isReady) {
+                return null;
+            }
+
+            const url = `${this.KeenConnector.props.KEEN_HOST}${path}`;
+            const headers = new Headers();
+
+            headers.append('Authorization', `Bearer ${this.KeenConnector.token}`);
+            headers.append('Origin', this.KeenConnector.props.ORIGIN);
+            headers.append('Content-Type', 'application/json');
+
+            const requestOptions = {
+                method: 'GET',
+                headers: headers,
+                redirect: 'follow'
+            } as RequestInit;
+
+            const result = await fetch(url, requestOptions);
+            const text = await result.text();
+            let data: Keen.AgentFrontSettingsResponse | null = null;
+
+            try {
+                data = JSON.parse(text) as Keen.AgentFrontSettingsResponse;
+            } catch {
+                return false;
+            }
+
+            console.log(`[keen] Resources: ${resourceName} (${agentId}) → HTTP ${result.status}`);
+
+            if (result.ok && data?.success && data.result) {
+                this.KeenConnector.cache.setAgentFrontSettings(data.result.agentId, data.result.jsonSettings ?? '');
+                return data.result.jsonSettings ?? '';
+            }
+
+            return false;
+        } catch (err) {
+            console.log(`[keen] ERROR: Resources: ${resourceName} → ${(err as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
      * Fetch THIS partner's consumer contract (application-token resource) — the
      * master `spaces` set plus the five per-contract policy booleans
      * (outsideRegistration, otp inside/outside, block inside/outside logins).
