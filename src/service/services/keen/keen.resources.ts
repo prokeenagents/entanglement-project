@@ -4,56 +4,6 @@ export default class KeenResources {
     constructor(private KeenConnector: KeenConnector) {}
 
     /**
-     * Fetch the partner's Google Connect settings (application-token resource).
-     * Returns the parsed body, false on a non-JSON response, or null when not
-     * connected / on a transport error.
-     */
-    async getGoogleConnectResources() {
-        const resourceName = 'Google Connect';
-        const path = `/keen-api/resources/google_settings`;
-
-        try {
-            if (!this.KeenConnector.isReady) {
-                return null;
-            }
-
-            const url = `${this.KeenConnector.props.KEEN_HOST}${path}`;
-            const headers = new Headers();
-
-            headers.append('Authorization', `Bearer ${this.KeenConnector.token}`);
-            headers.append('Origin', this.KeenConnector.props.ORIGIN);
-            headers.append('Content-Type', 'application/json');
-
-            const requestOptions = {
-                method: 'GET',
-                headers: headers,
-                redirect: 'follow'
-            } as RequestInit;
-
-            const result = await fetch(url, requestOptions);
-            const text = await result.text();
-            let data: unknown = text;
-
-            try {
-                data = JSON.parse(text);
-            } catch {
-                return false;
-            }
-
-            console.log(`[keen] Resources: ${resourceName} → HTTP ${result.status}`);
-
-            if (result.ok) {
-                this.KeenConnector.cache.setGoogleConnect(data);
-            }
-
-            return data;
-        } catch (err) {
-            console.log(`[keen] ERROR: Resources: ${resourceName} → ${(err as Error).message}`);
-            return null;
-        }
-    }
-
-    /**
      * Fetch the list of spaces available to the partner (application-token
      * resource). Returns the parsed body, false on a non-JSON response, or null
      * when not connected / on a transport error.
@@ -220,5 +170,69 @@ export default class KeenResources {
         this.KeenConnector.cache.setConsumerContract(null);
         this.KeenConnector.setActive(false);
         console.log(`[keen] Resources: Consumer Contract → removed (cache cleared, connector deactivated)`);
+    }
+
+    /**
+     * Fetch THIS partner's consumer POLICY (application-token resource) — the
+     * LIVE registration/login booleans + the default-space subsets, scoped to
+     * the caller's own api_key by the relay. This is the authoritative policy;
+     * the consumer-contract endpoint only carries mapped defaults. Returns the
+     * parsed body, false on a non-JSON response, or null when not connected / on
+     * a transport error (`result` is null when the api_key has no contract bound).
+     */
+    async getConsumerPolicy() {
+        const resourceName = 'Consumer Policy';
+        const path = `/keen-api/resources/consumer-policy`;
+
+        try {
+            if (!this.KeenConnector.isReady) {
+                return null;
+            }
+
+            const url = `${this.KeenConnector.props.KEEN_HOST}${path}`;
+            const headers = new Headers();
+
+            headers.append('Authorization', `Bearer ${this.KeenConnector.token}`);
+            headers.append('Origin', this.KeenConnector.props.ORIGIN);
+            headers.append('Content-Type', 'application/json');
+
+            const requestOptions = {
+                method: 'GET',
+                headers: headers,
+                redirect: 'follow'
+            } as RequestInit;
+
+            const result = await fetch(url, requestOptions);
+            const text = await result.text();
+            let data: unknown = text;
+
+            try {
+                data = JSON.parse(text);
+            } catch {
+                return false;
+            }
+
+            console.log(`[keen] Resources: ${resourceName} → HTTP ${result.status}`);
+
+            if (result.ok) {
+                this.KeenConnector.cache.setConsumerPolicy(data as Keen.ConsumerPolicyResponse);
+            }
+
+            return data;
+        } catch (err) {
+            console.log(`[keen] ERROR: Resources: ${resourceName} → ${(err as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Clear the cached consumer policy — the twin of removeConsumerContract, for
+     * an `r_consumer_policy_delete` webhook (the contract, and its policy, was
+     * deleted upstream). Deactivation is left to removeConsumerContract so a
+     * single delete doesn't deactivate twice.
+     */
+    removeConsumerPolicy() {
+        this.KeenConnector.cache.setConsumerPolicy(null);
+        console.log(`[keen] Resources: Consumer Policy → removed (cache cleared)`);
     }
 }

@@ -99,12 +99,17 @@ export async function POST(req: NextRequest) {
                 globalThis.__keenConnector?.reconnect();
             }
 
+            // A contract change (spaces / defaults / policy / name-key) fires this.
+            // Re-read BOTH halves: the contract (identity + master spaces) AND the
+            // live policy (the registration/login booleans + default-space subsets,
+            // which the contract endpoint only carries as mapped defaults).
             if (instructions.includes('r_consumer_policy')) {
-                globalThis.__keenConnector?.resources.getConsumerContract();
+                await Promise.allSettled([globalThis.__keenConnector?.resources.getConsumerContract(), globalThis.__keenConnector?.resources.getConsumerPolicy()]);
             }
 
             if (instructions.includes('r_consumer_policy_delete')) {
                 globalThis.__keenConnector?.resources.removeConsumerContract();
+                globalThis.__keenConnector?.resources.removeConsumerPolicy();
             }
 
             if (instructions.includes('r_cert')) {

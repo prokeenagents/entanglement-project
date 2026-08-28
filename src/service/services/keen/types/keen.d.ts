@@ -41,6 +41,31 @@ declare global {
             result: ConsumerContract | null;
         }
 
+        /**
+         * The LIVE per-contract policy — the half consumer-contract can only give
+         * as mapped defaults. Served by GET /v1/resources/consumer-policy, scoped
+         * to this api_key. `defaultSystemSpaces` / `defaultOutsideSpaces` are the
+         * space-id subsets seeded to a system- / outside-registered consumer.
+         */
+        interface ConsumerPolicy {
+            id: string;
+            key: string;
+            outsideRegistration: boolean;
+            otpInsideRegistration: boolean;
+            otpOutsideRegistration: boolean;
+            blockOutsideRegistrationLogins: boolean;
+            blockSystemRegistrationLogins: boolean;
+            defaultSystemSpaces: string[];
+            defaultOutsideSpaces: string[];
+        }
+
+        interface ConsumerPolicyResponse {
+            success: boolean;
+            status: number;
+            message: string;
+            result: ConsumerPolicy | null;
+        }
+
         interface ConsumerAccessTokenBody {
             email: string;
             password: string;

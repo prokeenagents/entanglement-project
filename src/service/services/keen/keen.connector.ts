@@ -175,7 +175,7 @@ export default class KeenConnector {
 
         await this.tryActivate(async () => {
             await this.resources.getConsumerContract();
-            await this.resources.getGoogleConnectResources();
+            await this.resources.getConsumerPolicy();
             await this.resources.getSpaceList();
             await this.resources.getConsumerContract();
         });

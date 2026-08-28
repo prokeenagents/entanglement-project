@@ -1,27 +1,13 @@
 import KeenConnector from './keen.connector';
 
 export default class KeenCache {
-    private googleConnect: unknown = null;
     private spaceList: unknown = null;
     private consumerContract: Keen.ConsumerContractResponse | null = null;
+    private consumerPolicy: Keen.ConsumerPolicyResponse | null = null;
     /** Per-agent Front Settings (raw JSON string, '' = none), keyed by agent SLUG. Lazily filled, refreshed by the webhook. */
     private frontSettings = new Map<string, string>();
 
     constructor(private KeenConnector: KeenConnector) {}
-
-    /**
-     * Store the latest successful Google Connect settings result.
-     */
-    setGoogleConnect(data: unknown) {
-        this.googleConnect = data;
-    }
-
-    /**
-     * Return the cached Google Connect settings, or null if none fetched yet.
-     */
-    getGoogleConnect(): unknown {
-        return this.googleConnect;
-    }
 
     /**
      * Store the latest successful Space List result.
@@ -50,6 +36,22 @@ export default class KeenCache {
      */
     getConsumerContract(): Keen.ConsumerContractResponse | null {
         return this.consumerContract;
+    }
+
+    /**
+     * Store the latest successful Consumer Policy result (the LIVE registration/
+     * login booleans + default-space subsets — distinct from the contract, which
+     * only carries mapped-default policy values).
+     */
+    setConsumerPolicy(data: Keen.ConsumerPolicyResponse | null) {
+        this.consumerPolicy = data;
+    }
+
+    /**
+     * Return the cached Consumer Policy, or null if none fetched yet.
+     */
+    getConsumerPolicy(): Keen.ConsumerPolicyResponse | null {
+        return this.consumerPolicy;
     }
 
     /**
