@@ -82,8 +82,10 @@ export async function POST(req: NextRequest) {
             // re-read the settings for every agent this site has actually used (the
             // connector cache keys) BEFORE announcing, so handlers and pages read the
             // fresh values, not the stale cache. The webhook body carries no agent id
-            // by convention — the fetch leg is the source of truth.
-            if (instructions.includes('r_agent_front_settings')) {
+            // by convention — the fetch leg is the source of truth. Two triggers land
+            // here: `r_agent_front_settings` (an admin saved the front settings) and
+            // `r_json` (an api-key WAKE, which re-pushes the front JSON among its caches).
+            if (instructions.includes('r_agent_front_settings') || instructions.includes('r_json')) {
                 const agentIds = globalThis.__keenConnector?.cache.getAgentFrontSettingsKeys() ?? [];
                 await Promise.allSettled(agentIds.map(agentId => globalThis.__keenConnector?.resources.getAgentFrontSettings(agentId)));
 
