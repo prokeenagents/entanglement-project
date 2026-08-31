@@ -4,6 +4,11 @@ import { CHAT_SETTINGS } from './settings';
 import TaskQueue from './task-queue';
 import WSConnectAPI from './connect';
 
+// The minimal connector — connect a consumer to an agent and chat with just
+// { ws, token, email }, nothing else (no cert / WAKE / partner credentials).
+export { default as KeenChat } from './keen-chat';
+export type { KeenChatConfig, KeenChatRun } from './keen-chat';
+
 /**
  * ChatAPI — THE chat client front door.
  *
