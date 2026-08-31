@@ -34,6 +34,72 @@ The app must be reached on an **origin that is allow-listed on the Keen api_key*
 (see `ORIGIN` in `src/service/services/keen/keen.ts`). Hitting it on a different
 host/port fails Keen's `OriginGuard`.
 
+## Running against a Keen sandbox
+
+The site is **inert until Keen WAKEs it** — a WAKE is the only channel that
+delivers the signing certificate, so before it the connector holds no cert, mints
+no application token, and `isReady` stays `false` (`[BOOT] Application activated:
+false`, `keen.connector.ts`). Full setup:
+
+**1. Wire the api_key in the Keen admin.** For the partner api_key you'll use,
+bind a **client**, a **certificate** and a **consumer contract**, allow-list this
+app's public **origin**, and set the api_key's **webhook URL** to this site's
+`https://<public-host>/api/keen-webhook` — the inbound channel Keen POSTs to.
+
+**2. Expose the site with an ngrok tunnel** so the webhook can reach it:
+
+```bash
+ngrok http 3000                       # → https://<id>.ngrok-free.app
+```
+
+Use that ngrok URL as **both** the webhook target (step 1) and `KEEN_ORIGIN` (the
+page's origin — what the relay's `OriginGuard` allow-lists). Do **not** route the
+chat WebSocket through ngrok: a free tunnel 503s a browser WS upgrade, so `KEEN_WS`
+points straight at the relay's own domain (only inbound webhooks ride the tunnel).
+
+**3. Fill `.env.local`** (`cp .env.example .env.local`, then edit):
+
+```
+KEEN_HOST=https://<sandbox-host>            # the Keen edge (dev: https://localhost)
+KEEN_WS=wss://<sandbox-host>/ws-keen        # the relay — NEVER ngrok
+KEEN_ORIGIN=https://<id>.ngrok-free.app     # the allow-listed page origin
+KEEN_CLIENT_ID=…   KEEN_CLIENT_SECRET=…
+KEEN_API_KEY_ID=…  KEEN_API_KEY_SECRET=…
+```
+
+`readKeenConfig()` runs at connector **construction** (the `globalThis.__keenConnector`
+singleton in `keen.ts`), so any `.env.local` change needs a **full dev-server
+restart** — Fast Refresh won't rebuild it.
+
+**4. Run it:**
+
+```bash
+npm install
+npm run dev-local     # TLS verification off for the self-signed https://localhost edge
+```
+
+**5. WAKE it from the Keen admin** (the api_key's detail page → **Wake**). Keen
+POSTs to `/api/keen-webhook`:
+
+- `{ "synch-data": "r_cert", result: { cert, key } }` → `connector.setCertificate()`
+  — the public cert plus the shared secret it signs with; **the only channel that
+  carries `key`**.
+- `{ "synch-data": ["r_api_keys", "r_consumer_policy", "r_json", …] }` → the
+  connector re-fetches its **caches** (`keen.cache.ts`: space list, consumer
+  contract, consumer policy, agent front-settings) so reads are served locally.
+
+Once the cert **and** an application token are both held the connector flips
+`active = true` (`[BOOT] Application activated: true`) and the chat + resource
+routes work. Later admin edits keep the caches fresh through the same webhook:
+`r_space`/`r_agent` re-pull the space list, `r_consumer_policy` the contract +
+policy, `r_agent_front_settings`/`r_json` the front settings; the consumer-logout
+kinds force a re-login. A WAKE re-runs the whole delivery, so it's also the way to
+re-sync a site that started before its api_key was fully wired.
+
+> **"Certificate signer not available"** on the Keen side means the sandbox couldn't
+> load the cert's private key (a stale cert-store mount) — not a fault here; the
+> site simply never receives a usable cert to activate with.
+
 ## Architecture
 
 ### The Keen connector — a server-only singleton
