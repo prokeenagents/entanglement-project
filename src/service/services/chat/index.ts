@@ -49,6 +49,21 @@ export default class ChatAPI {
      * setAccessToken(); all task-queue frames read this live value.
      */
     accessToken: string;
+    /**
+     * Cookies forwarded to script nodes on the initial run (read via
+     * system/cookies). A list of NAMES filters the browser's document.cookie
+     * (`undefined` = all, `[]` = none); an explicit { name: value } MAP is used
+     * AS-IS with no browser (how a headless caller / CLI agent supplies them).
+     * See ChatAPIOptions.cookies.
+     */
+    readonly cookieConfig?: readonly string[] | Record<string, string>;
+    /**
+     * Max parallelContext clones drained per wave. Undefined ⇒ the SDK default
+     * (CHAT_SETTINGS.CONTEXT_BATCH_SIZE). Only a positive integer is honoured —
+     * anything else is dropped here so TaskQueue falls back to the default (a
+     * non-positive batch would stall the fan-out loop). See ChatAPIOptions.contextBatchSize.
+     */
+    readonly contextBatchSize?: number;
 
     constructor(options: App.Chat.ChatAPIOptions) {
         this.spaceID = options.spaceID;
@@ -59,6 +74,11 @@ export default class ChatAPI {
         // doesn't pass one, so a run only has to name the space.
         this.projectID = options.projectID ?? options.spaceID;
         this.accessToken = options.accessToken;
+        this.cookieConfig = options.cookies;
+        this.contextBatchSize =
+            typeof options.contextBatchSize === 'number' && Number.isInteger(options.contextBatchSize) && options.contextBatchSize > 0
+                ? options.contextBatchSize
+                : undefined;
         this.responseApi = new ResponseAPI();
         // url defaults to the SDK's configured relay endpoint (CHAT_SETTINGS.WS_URL);
         // pass options.url only to point at a different relay per deployment.

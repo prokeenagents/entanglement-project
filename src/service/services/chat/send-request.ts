@@ -1,6 +1,6 @@
 import WSConnectAPI from './connect';
 import { CHAT_SETTINGS } from './settings';
-import { generateRequestId, sleep } from './utils';
+import { byteLength, FatalSendError, generateRequestId, sleep } from './utils';
 
 type OutboundFrame = App.Chat.OutboundFrame;
 type InitialRunPayload = App.Chat.InitialRunPayload;
@@ -87,6 +87,22 @@ export default class SendRequest {
                 payload
             }
         };
+
+        /**
+         * Fail fast on an UNDELIVERABLE frame. A frame past MAX_FRAME_BYTES can
+         * never cross the relay→engine hop (NATS max_payload), so it fails the
+         * SAME way on every attempt — and a continuation retries with an
+         * infinite budget, which would loop forever (the relay drops it / closes
+         * the socket, never a clean envelope). Reject it as NON-retryable here so
+         * the caller's catch aborts the run with a clear reason instead of hanging.
+         */
+        const bytes = byteLength(JSON.stringify(frame));
+        if (bytes > CHAT_SETTINGS.MAX_FRAME_BYTES) {
+            const mb = (n: number): string => (n / (1024 * 1024)).toFixed(1);
+            throw new FatalSendError(
+                `frame is ${mb(bytes)}MB, over the ${mb(CHAT_SETTINGS.MAX_FRAME_BYTES)}MB limit — it cannot cross the relay→engine hop and would retry forever; aborting the run. Reduce the payload (large dictionary/session values, a huge script result, or an oversized prompt).`
+            );
+        }
 
         let attempt = 0;
 

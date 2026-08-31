@@ -67,5 +67,17 @@ export const CHAT_SETTINGS = {
      * request never began). Continuations retry infinitely instead — the flow is
      * already alive server-side, so we keep trying until the socket recovers.
      */
-    INITIAL_MAX_RETRIES: 10
+    INITIAL_MAX_RETRIES: 10,
+
+    /**
+     * Hard cap on a single outbound frame (bytes of its JSON). A frame above
+     * this can NEVER traverse the relay→engine hop — NATS enforces max_payload
+     * 8MB, so an oversized frame fails DETERMINISTICALLY every time. Because a
+     * continuation retries on ANY error with an infinite budget, sending one
+     * would loop forever (the relay drops it / closes the socket, never a clean
+     * envelope). So the client rejects it UP FRONT as non-retryable instead of
+     * hanging. Mirror the server's NATS max_payload; lower it per deployment if
+     * a proxy caps smaller.
+     */
+    MAX_FRAME_BYTES: 8 * 1024 * 1024
 } as const;

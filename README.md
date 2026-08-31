@@ -329,6 +329,20 @@ sequential, parallel, tool sub-flows — to a terminal state.
   relay rejects the cuid with `E3101`.
 - **One turn at a time** — a concurrent `runFlow` is rejected with "TaskQueue
   already running", so the prompt gates Send on `running`.
+- **`ChatAPIOptions` also takes `cookies`** — forwarded to script nodes (read via
+  `system/cookies`) on the initial run. A list of NAMES filters the browser's
+  `document.cookie` (`[]` = none, omit = every JS-readable cookie; `HttpOnly` ones
+  are never visible so never sent), or an explicit `{ name: value }` MAP is used
+  as-is with no browser — how a headless / CLI caller (a building agent) supplies a
+  cookie a real user's browser would otherwise carry.
+- **…and `contextBatchSize`** — the max parallelContext clones drained per fan-out
+  wave (defaults to `CHAT_SETTINGS.CONTEXT_BATCH_SIZE`; only a positive integer is
+  honoured). The Keen server admits a bounded number at once, so above that the
+  extra clones meet backpressure (retried) rather than more throughput.
+- **An undeliverable frame fails fast** — a frame larger than
+  `CHAT_SETTINGS.MAX_FRAME_BYTES` (the relay→engine NATS `max_payload`) can never
+  cross the hop, so the SDK rejects it as non-retryable (`FatalSendError`) instead
+  of a continuation retrying it forever.
 
 The UI is `src/components/ui-chat`:
 

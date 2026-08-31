@@ -230,6 +230,32 @@ declare global {
                  * accessToken doesn't keep crossing the wire.
                  */
                 accessToken: string;
+                /**
+                 * Cookies forwarded to script nodes on the initial run (they
+                 * read values via `system/cookies`). Two shapes:
+                 *
+                 *  • a list of NAMES — `cookies: ['gconnect', 'locale']` — an
+                 *    allow-list read from the BROWSER's `document.cookie`; only
+                 *    those are forwarded (`[]` = none, omit = every JS-readable
+                 *    cookie, the default). `HttpOnly` cookies are never visible
+                 *    to `document.cookie`, so never forwarded.
+                 *
+                 *  • an explicit MAP — `cookies: { gconnect: '<token>' }` —
+                 *    used AS-IS, needing no browser. This is how a HEADLESS
+                 *    caller (a building agent running via the CLI) supplies a
+                 *    cookie a real user's browser would otherwise carry.
+                 */
+                cookies?: string[] | Record<string, string>;
+                /**
+                 * Max parallelContext clones drained concurrently in one wave
+                 * (the fan-out batch). Optional — defaults to
+                 * CHAT_SETTINGS.CONTEXT_BATCH_SIZE. Raise it for more parallel
+                 * requests; note the Keen server admits a bounded number at
+                 * once, so above that the extra clones meet backpressure
+                 * (retried) rather than more throughput. Honoured only when a
+                 * positive integer — otherwise the default constant is used.
+                 */
+                contextBatchSize?: number;
             }
 
             /**

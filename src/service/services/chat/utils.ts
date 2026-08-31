@@ -47,11 +47,16 @@ export function generateRequestId(): string {
  * the initial run so script nodes can read them via system/cookies. Note:
  * HttpOnly cookies are NOT visible to document.cookie and will not appear
  * here — only JS-readable cookies are forwarded.
+ *
+ * `allow` is an optional allow-list of cookie NAMES: when provided (even
+ * empty), ONLY those names are forwarded; when `undefined`, every JS-readable
+ * cookie is forwarded. So `[]` forwards nothing and omitting it forwards all.
  */
-export function readBrowserCookies(): Record<string, string> {
+export function readBrowserCookies(allow?: readonly string[]): Record<string, string> {
     if (typeof document === 'undefined' || !document.cookie) {
         return {};
     }
+    const filter = allow ? new Set(allow) : null;
     const out: Record<string, string> = {};
     for (const part of document.cookie.split(';')) {
         const idx = part.indexOf('=');
@@ -59,12 +64,56 @@ export function readBrowserCookies(): Record<string, string> {
             continue;
         }
         const name = part.slice(0, idx).trim();
-        if (!name) {
+        if (!name || (filter && !filter.has(name))) {
             continue;
         }
         out[name] = decodeURIComponent(part.slice(idx + 1).trim());
     }
     return out;
+}
+
+/**
+ * Resolve the `requestContext.cookies` map for the initial run from the
+ * caller's cookie config. An explicit `{ name: value }` MAP is used AS-IS (no
+ * browser needed — this is how a headless caller / a building agent supplies a
+ * cookie a real user's browser would otherwise carry); a list of NAMES (or
+ * nothing) reads the browser's document.cookie, optionally filtered to those
+ * names.
+ */
+export function resolveRequestCookies(config?: readonly string[] | Record<string, string>): Record<string, string> {
+    if (config && !Array.isArray(config)) {
+        return { ...(config as Record<string, string>) };
+    }
+
+    return readBrowserCookies(config as readonly string[] | undefined);
+}
+
+/**
+ * A NON-RETRYABLE send failure — the frame cannot be delivered and retrying
+ * would loop forever (e.g. it exceeds the transport's payload cap). The retry
+ * loops in SendRequest and TaskQueue re-throw this instead of retrying, so the
+ * run aborts cleanly with a clear reason.
+ */
+export class FatalSendError extends Error {
+    readonly fatal = true as const;
+
+    constructor(message: string) {
+        super(message);
+        this.name = 'FatalSendError';
+    }
+}
+
+/** UTF-8 byte length of a string, without allocating a second big buffer where
+ *  possible (Buffer in Node, Blob in the browser, TextEncoder as the fallback). */
+export function byteLength(text: string): number {
+    if (typeof Buffer !== 'undefined') {
+        return Buffer.byteLength(text, 'utf8');
+    }
+    if (typeof Blob !== 'undefined') {
+        return new Blob([text]).size;
+    }
+
+    return new TextEncoder().encode(text).length;
 }
 
 /**

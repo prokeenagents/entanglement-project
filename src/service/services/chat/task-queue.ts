@@ -1,6 +1,6 @@
 import type ChatAPI from './index';
 import { CHAT_SETTINGS } from './settings';
-import { generateRequestId, generateUUID, readBrowserCookies, sleep } from './utils';
+import { FatalSendError, generateRequestId, generateUUID, resolveRequestCookies, sleep } from './utils';
 
 type NodeTask = App.Chat.NodeTask;
 type FlowTaskBundle = App.Chat.FlowTaskBundle;
@@ -160,7 +160,7 @@ export default class TaskQueue {
                      * can't see HttpOnly cookies — those won't appear here.)
                      */
                     requestContext: {
-                        cookies: readBrowserCookies()
+                        cookies: resolveRequestCookies(this.chat.cookieConfig)
                     }
                 };
 
@@ -536,6 +536,17 @@ export default class TaskQueue {
                     return;
                 }
 
+                /**
+                 * A NON-retryable failure — an undeliverable oversized frame —
+                 * fails identically on every attempt, so retrying (with an
+                 * infinite budget for a continuation) would loop forever. Re-throw
+                 * it straight through the drain to the run() catch, which cancels
+                 * the cid and settles runFlow with this reason.
+                 */
+                if (err instanceof FatalSendError) {
+                    throw err;
+                }
+
                 lastError = err instanceof Error ? err.message : String(err);
 
                 if (attempt < maxResponseRetries) {
@@ -887,7 +898,7 @@ export default class TaskQueue {
          * a single fan-out won't self-reject. `completed` counts so
          * "1000 of 1000 ready" is observable.
          */
-        const BATCH = CHAT_SETTINGS.CONTEXT_BATCH_SIZE;
+        const BATCH = this.chat.contextBatchSize ?? CHAT_SETTINGS.CONTEXT_BATCH_SIZE;
         let completed = 0;
 
         for (let start = 0; start < ids.length; start += BATCH) {
