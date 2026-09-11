@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     // The free subdomain rotates on every ngrok restart, so a wildcard means you never
     // edit this again. NOTE: this only matters when you load the APP through the ngrok
     // URL in a browser — the webhook API route itself is not gated by allowedDevOrigins.
-    allowedDevOrigins: ['192.168.68.120', '*.ngrok-free.app'],
+    allowedDevOrigins: ['*.ngrok-free.app', '*.ngrok-free.dev'],
     experimental: {}
 };
 
