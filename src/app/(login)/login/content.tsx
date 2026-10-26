@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Container, Text, VStack } from '@chakra-ui/react';
+import { Text, VStack } from '@chakra-ui/react';
 import { LoginForm } from './components/forms/login';
 import { OtpForm } from './components/forms/otp';
 import { LocalStorage } from '@/utils/localStorage';
@@ -95,7 +95,7 @@ export default function Content(props: { resetSuccess: boolean; registrationSucc
     }
 
     return (
-        <VStack minH="dvh" minW="dvw" bg="grey.200" alignItems="center" justifyContent="center">
+        <VStack w="full" alignItems="center" justifyContent="center">
             <VStack justifyContent="center" w="full">
                 {showResetSuccess && (
                     <Text color="green.500" mb={4}>

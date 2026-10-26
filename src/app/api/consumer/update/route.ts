@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken, setSessionCookies } from '@/utils/cookies';
+import { publicMessage } from '@/utils/upstream-reply';
 
 /**
  * POST /api/consumer/update  —  body: { firstName, lastName, gender, dobDay, dobMonth, dobYear }
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Narrow the two-token envelope: the success shape carries `success` + `message`,
     // the error shape carries `error` + `message[]`.
     if (!('success' in reply) || reply.success !== true) {
-        const message = 'success' in reply ? reply.message : Array.isArray(reply.message) ? reply.message.join(', ') : reply.error;
+        const message = publicMessage('success' in reply ? reply.message : (reply.message ?? reply.error), 'The change could not be saved. Please try again.');
 
         return NextResponse.json({ success: false, message }, { status: 400 });
     }

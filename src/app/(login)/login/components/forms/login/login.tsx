@@ -13,7 +13,6 @@ import { useLogin } from '@/hooks/login';
 import { LocalStorage } from '@/utils/localStorage';
 import { OTP_CONFIG } from '@/configs/otp.config';
 import { PAGE_CONFIG } from '@/configs/page.config';
-import { Logo } from '@/components/ui/logo';
 import { CardShell } from '@/components/ui/card-shell';
 
 export const Component: React.FC<{
@@ -100,21 +99,10 @@ export const Component: React.FC<{
     return (
         <>
             <VStack gap="8">
-                <HStack gap="1">
-                    <Logo />
-                    <VStack gap="0" alignItems="flex-start">
-                        <Text fontSize="sm" color="cyan.700" lineHeight="1.2">
-                            <strong>Entanglement</strong>
-                        </Text>
-                        <Text fontSize="xs" color="cyan.700" opacity="0.75" lineHeight="1.2">
-                            Project
-                        </Text>
-                    </VStack>
-                </HStack>
-                <CardShell title="Sign In" description="Fill in the form below to login.">
+                <CardShell title="Sign in" description="Welcome back. Sign in to continue to your agents.">
                     <form action="/" onSubmit={handleSubmit(onSubmit)}>
                         <HStack w="100%" justifyContent="center" align="center">
-                            <VStack gap="4" w="450px">
+                            <VStack gap="4" w="full">
                                 <Stack w="full" gap="2">
                                     <Field.Root invalid={!!errors.email || !!errors.root} gap="0">
                                         <Field.Label>
@@ -141,7 +129,7 @@ export const Component: React.FC<{
                                     <Field.Root invalid={!!errors.root}>
                                         <Button disabled={form.formState.isSubmitting || !isFormValid} type="submit" w="full">
                                             {form.formState.isSubmitting && <Spinner size="sm" />}
-                                            <Text as="span">Login</Text>
+                                            <Text as="span">Sign in</Text>
                                         </Button>
 
                                         {/* type="button": inside a <form> a button defaults to

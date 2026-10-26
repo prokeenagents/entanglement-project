@@ -1,6 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
+import { newPasswordSchema } from './password';
+
 /**
  * The logged-in "change my password" form on the account page.
  *
@@ -12,10 +14,10 @@ import { z } from 'zod';
  */
 export const passwordFormSchema = z
     .object({
-        password: z.string().min(8, { error: 'At least 8 characters' }),
-        confirmPassword: z.string().min(8, { error: 'Confirm your new password' })
+        password: newPasswordSchema,
+        confirmPassword: z.string().min(1, { error: 'Confirm your new password' })
     })
-    // Without this the confirm field is decorative (each only has to be 8+ chars).
+    // Without this the confirm field is decorative.
     .refine(data => data.password === data.confirmPassword, { error: 'Passwords do not match', path: ['confirmPassword'] });
 
 export const generatePasswordHookFormPayload = () => ({

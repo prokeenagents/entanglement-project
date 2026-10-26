@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useAuth } from '@/contexts/auth';
 import { useConsumer } from '@/contexts/consumer';
 import ChatAPI from '@/service/services/chat';
+import { DemoChatClient } from '@/demo/demo-chat-client';
 import { generateUUID } from '@/utils/global';
 
 type ChatShellValue = {
@@ -124,7 +125,7 @@ export const Component: React.FC<
     const [running, setRunning] = useState(false);
     const [messages, setMessages] = useState<App.ChatUI.Message[]>([]);
 
-    const chatRef = useRef<ChatAPI | null>(null);
+    const chatRef = useRef<App.ChatUI.Client | null>(null);
     /** The agent bubble currently being streamed into; reset at the start of each turn. */
     const agentMessageId = useRef<string | null>(null);
 
@@ -145,15 +146,18 @@ export const Component: React.FC<
          * The client can only be born here — not in render (that would mint one per
          * re-render, and connect() has no WebSocket during SSR).
          */
-        const instance = new ChatAPI({
-            spaceID,
-            agentID: agentSlugID, // the SLUG — the cuid comes back as E3101
-            userId: userID,
-            email,
-            accessToken,
-            url: consumer.wsUrl
-            // url defaults to CHAT_SETTINGS.WS_URL, projectID to spaceID — see chat/settings.ts
-        });
+        const instance: App.ChatUI.Client = consumer.demo
+            ? // Demo mode (utils/demo.ts): an in-memory agent with the same surface.
+              new DemoChatClient(agentSlugID)
+            : new ChatAPI({
+                  spaceID,
+                  agentID: agentSlugID, // the SLUG — the cuid comes back as E3101
+                  userId: userID,
+                  email,
+                  accessToken,
+                  url: consumer.wsUrl
+                  // url defaults to CHAT_SETTINGS.WS_URL, projectID to spaceID — see chat/settings.ts
+              });
 
         instance.onStatus(next => setStatus(next));
 
@@ -190,12 +194,17 @@ export const Component: React.FC<
 
                 const id = generateUUID();
                 agentMessageId.current = id;
-                setMessages(prev => appendCapped(prev, { id, role: 'agent', text }));
+                setMessages(prev => appendCapped(prev, { id, role: 'agent', text, at: Date.now() }));
 
                 return;
             }
 
-            setMessages(prev => appendCapped(prev, { id: generateUUID(), role: event === 'error' ? 'error' : 'event', event, text }));
+            // An engine event splits the answer: tokens after it open a NEW agent row,
+            // so the rows stay in the order things happened and the run trace can
+            // tell interim narration ("let me check…") from the final answer.
+            agentMessageId.current = null;
+
+            setMessages(prev => appendCapped(prev, { id: generateUUID(), role: event === 'error' ? 'error' : 'event', event, text, at: Date.now() }));
         });
 
         chatRef.current = instance;
@@ -210,7 +219,7 @@ export const Component: React.FC<
         };
         // accessToken is deliberately NOT a dependency — see the sync effect below.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chatID, spaceID, agentSlugID, userID, email]);
+    }, [chatID, spaceID, agentSlugID, userID, email, consumer.demo]);
 
     /**
      * Keep the live client's token current. The relay verifies it on EVERY frame,
@@ -271,7 +280,7 @@ export const Component: React.FC<
                 return;
             }
 
-            setMessages(prev => appendCapped(prev, { id: generateUUID(), role: 'user', text: trimmed }));
+            setMessages(prev => appendCapped(prev, { id: generateUUID(), role: 'user', text: trimmed, at: Date.now() }));
 
             try {
                 await instance.runFlow({ chatId: chatID, prompt: trimmed });
@@ -281,12 +290,12 @@ export const Component: React.FC<
                 // A user cancel unwinds runFlow with CANCELLED_MESSAGE. That's intent,
                 // not failure — surface it as a quiet event row, never a red error.
                 if (message === CANCELLED_MESSAGE) {
-                    setMessages(prev => appendCapped(prev, { id: generateUUID(), role: 'event', event: 'canceled', text: 'Canceled.' }));
+                    setMessages(prev => appendCapped(prev, { id: generateUUID(), role: 'event', event: 'canceled', text: 'Canceled.', at: Date.now() }));
 
                     return;
                 }
 
-                setMessages(prev => appendCapped(prev, { id: generateUUID(), role: 'error', text: message }));
+                setMessages(prev => appendCapped(prev, { id: generateUUID(), role: 'error', text: message, at: Date.now() }));
             }
         },
         [chatID]

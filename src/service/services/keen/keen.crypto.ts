@@ -19,20 +19,21 @@ const TAG_LEN = 16;
 const KEY_LEN = 32;
 
 /**
- * The fallback when a certificate carries no secret. Fixed + weak on purpose: it
- * makes the seal reversible by anyone, so it is obfuscation, not protection. Must
- * match Keen's DEFAULT_SECRET exactly, or a default-keyed payload won't cross.
- */
-const DEFAULT_SECRET = 'aaaaaaaaaaaaaaaa';
-
-/**
- * Stretch the secret (16–32 chars, or the default) to a 32-byte AES-256 key. The
- * `purpose` domain-separates it: 'token' for the access/refresh payload, 'otp' for
- * the login OTP hash — a blob from one context can't open in the other.
+ * Stretch the per-certificate secret to a 32-byte AES-256 key. The `purpose`
+ * domain-separates it: 'token' for the access/refresh payload, 'otp' for the login
+ * OTP hash — a blob from one context can't open in the other.
+ *
+ * There is deliberately NO fallback for an empty secret. Keen seals with a fixed
+ * public default when a certificate has no key, which anyone can reverse — so the
+ * partner side refuses to seal or open with it at all (the connector also refuses
+ * such a certificate). Generate a secret on the certificate in the Keen admin.
  */
 function deriveKey(secret: string, purpose: string): Buffer {
-    const material = secret && secret.length > 0 ? secret : DEFAULT_SECRET;
-    return Buffer.from(hkdfSync('sha256', Buffer.from(material, 'utf8'), Buffer.alloc(0), Buffer.from(`keen/consumer-${purpose}/v1`), KEY_LEN));
+    if (!secret) {
+        throw new Error('No certificate secret key: refusing to seal or open with the public default.');
+    }
+
+    return Buffer.from(hkdfSync('sha256', Buffer.from(secret, 'utf8'), Buffer.alloc(0), Buffer.from(`keen/consumer-${purpose}/v1`), KEY_LEN));
 }
 
 /** Encrypt `plaintext` → base64url(iv || tag || ciphertext). */

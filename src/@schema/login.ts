@@ -1,13 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
+/**
+ * Login checks only that a password was typed — never the new-password rule in
+ * @schema/password — so an account made under an older, weaker rule can still sign in.
+ */
 export const formSchema = z.object({
     email: z.email().min(2, {
         error: 'Invalid email'
     }),
 
-    password: z.string().min(8, {
-        error: 'Invalid password'
+    password: z.string().min(1, {
+        error: 'Enter your password'
     })
 });
 

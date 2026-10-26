@@ -15,7 +15,7 @@ export default class KeenConsumer {
 
         try {
             KeenValidator.validateEmail(body.email);
-            KeenValidator.validatePassword(body.password);
+            KeenValidator.validateLoginPassword(body.password);
 
             if (!this.KeenConnector.isReady) {
                 return null;

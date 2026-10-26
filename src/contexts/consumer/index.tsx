@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo } from 'react';
 
 import { AUTH_API_CONFIG } from '@/configs/api.config';
+import { demoChatApi } from '@/demo/demo-store';
 
 /**
  * Client-side access to the signed-in consumer.
@@ -17,12 +18,9 @@ import { AUTH_API_CONFIG } from '@/configs/api.config';
  * the browser can't, because the application_token lives server-side on the
  * connector and the access token is an httpOnly cookie it cannot read.
  *
- * SECURITY: whatever is put in `value` is serialized into the client bundle. The
- * `accessToken` / `refreshToken` on `Keen.ConsumerData` are httpOnly cookies —
- * only include them here if the browser genuinely needs them (it does not: the
- * chat methods below go through the server, which reads the cookies itself).
- * Prefer stripping them in the layout and providing only `consumerSpaces` /
- * `agents` / `tokenPayload`.
+ * SECURITY: whatever is put in `value` is serialized into the client bundle. It
+ * carries the access token (the chat WebSocket needs it) but never the refresh
+ * token — `Keen.ConsumerData` has no field for it, so it can't be added by accident.
  */
 const ConsumerContext = createContext<App.Consumer.ContextValue | null>(null);
 
@@ -51,39 +49,45 @@ function jsonPost(body: unknown): RequestInit {
 export function ConsumerProvider({ value, children }: { value: Keen.ConsumerData; children: React.ReactNode }) {
     // Built once — the methods close over nothing, so their identity is stable
     // and they're safe to use in a dependency array.
+    const demo = value.demo === true;
+
     const chat = useMemo<App.Consumer.ChatApi>(
-        () => ({
-            list: () => callChatApi(AUTH_API_CONFIG.CHAT_LIST.URL),
+        () =>
+            // Demo mode (utils/demo.ts): the same contract, served from memory.
+            demo
+                ? demoChatApi
+                : {
+                      list: () => callChatApi(AUTH_API_CONFIG.CHAT_LIST.URL),
 
-            history: (chatId, options) => {
-                const params = new URLSearchParams({ chatId });
+                      history: (chatId, options) => {
+                          const params = new URLSearchParams({ chatId });
 
-                if (options?.limit) {
-                    params.set('limit', String(options.limit));
-                }
+                          if (options?.limit) {
+                              params.set('limit', String(options.limit));
+                          }
 
-                if (options?.before) {
-                    params.set('before', options.before);
-                }
+                          if (options?.before) {
+                              params.set('before', options.before);
+                          }
 
-                return callChatApi(`${AUTH_API_CONFIG.CHAT_HISTORY.URL}?${params.toString()}`);
-            },
+                          return callChatApi(`${AUTH_API_CONFIG.CHAT_HISTORY.URL}?${params.toString()}`);
+                      },
 
-            search: (query, limit) => {
-                const params = new URLSearchParams({ q: query });
+                      search: (query, limit) => {
+                          const params = new URLSearchParams({ q: query });
 
-                if (limit) {
-                    params.set('limit', String(limit));
-                }
+                          if (limit) {
+                              params.set('limit', String(limit));
+                          }
 
-                return callChatApi(`${AUTH_API_CONFIG.CHAT_SEARCH.URL}?${params.toString()}`);
-            },
+                          return callChatApi(`${AUTH_API_CONFIG.CHAT_SEARCH.URL}?${params.toString()}`);
+                      },
 
-            setTitle: (chatId, title) => callChatApi(AUTH_API_CONFIG.CHAT_SET_TITLE.URL, jsonPost({ chatId, title })),
+                      setTitle: (chatId, title) => callChatApi(AUTH_API_CONFIG.CHAT_SET_TITLE.URL, jsonPost({ chatId, title })),
 
-            delete: chatId => callChatApi(AUTH_API_CONFIG.CHAT_DELETE.URL, jsonPost({ chatId }))
-        }),
-        []
+                      delete: chatId => callChatApi(AUTH_API_CONFIG.CHAT_DELETE.URL, jsonPost({ chatId }))
+                  },
+        [demo]
     );
 
     const context = useMemo<App.Consumer.ContextValue>(() => ({ ...value, chat }), [value, chat]);

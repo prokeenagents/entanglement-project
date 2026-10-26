@@ -60,6 +60,26 @@ No Tailwind, no shadcn/ui, no Radix. Component libraries built on those (AI
 Elements, prompt-kit, …) are not drop-in here; build with Chakra primitives or
 port the markup. Icons come from `react-icons`.
 
+## Theme: tokens only, nested, brand config first
+
+Colors, radii, shadows and fonts come from `src/theme/` — `brand.config.ts` is the
+client-facing knob file, `tokens.ts` the semantic layer. Components use semantic
+tokens (`bg.panel`, `fg.muted`, `brand.solid`, `radii.card`…), never hex values.
+Semantic tokens must be **nested** (`bg: { panel: … }`) — Chakra silently ignores
+flat `'bg.panel'` keys, which falls back to Chakra's defaults with no error.
+
+A component that uses a Chakra compound (`Menu.Root`, `chakra.img`…) must be
+`'use client'` if a Server Component can render it — the property access on a
+client reference is `undefined` in RSC ("Element type is invalid").
+
+## Demo mode is dev-only
+
+`ENTANGLEMENT_DEMO=1` (see `src/utils/demo.ts`) fakes the session, the connector
+and the chat socket with `src/demo/*`. It is gated on `NODE_ENV !== 'production'`
+— keep it that way; it bypasses auth. New server data reads should add a demo
+branch next to the existing ones (`getConsumerData`, the (app) layout's chat list,
+the /user profile).
+
 ## Sealed hashes: purpose must match
 
 `keen.crypto.ts` is a **byte-mirror** of the platform's `token-crypto.ts`. `open()`
@@ -101,14 +121,15 @@ it has **zero project imports** — helpers like `generateUUID` are inlined, not
 pulled from `@/utils`. Keep it that way so it stays portable. `chat-shell` owns the
 `ChatAPI` in an effect + ref (never in render) and hands it down via `useChat()`.
 
-The tool-call chip (`chat-messages/system-call.tsx`) and the cancelled-row
-rendering both parse **strings the engine emits** (`<SYSTEM CALL>…</SYSTEM CALL>`,
+The tool-call parser (`chat-messages/system-call.tsx`, rendered as run-trace
+steps via `turns.ts`) and the cancelled-row rendering both parse **strings the
+engine emits** (`<SYSTEM CALL>…</SYSTEM CALL>`,
 `" :: Canceled ::"`). They're a display convenience, not a contract — if the engine
 changes those markers, update the parser.
 
 ## Server→client events: one provider, single-node bus, list the route
 
-The long-poll channel (`GET /api/events` ← `EventBus` ← `keen-webhook`) pushes
+The long-poll channel (`GET /api/events` ← `EventBus` ← `keen-webhook/[secret]`) pushes
 org-side changes to the browser (today: force-logout, and a space/agent change
 notice). Five things bite:
 
@@ -149,6 +170,30 @@ receiver re-fetches every CACHED agent slug **before** publishing the
 goes through `GET /api/agent-front-settings?agentId=` (listed in
 `AUTH_API_CONFIG`). Don't confuse this with the agent's runtime Json Settings —
 that channel belongs to Keen's script engine and never reaches this site.
+
+## Security invariants (from the 2026-09-30 beta security review)
+
+- **The webhook is authenticated by its URL.** Keen does not sign webhooks; the
+  route lives at `/api/keen-webhook/[secret]` and compares the segment to
+  `KEEN_WEBHOOK_SECRET` in constant time. `r_cert` material is further accepted only
+  inside the window of a redeem the connector itself started
+  (`connector.acceptCertificate`). Never call `setCertificate` from a request.
+- **No certificate secret, no service.** `keen.crypto` has no default-key fallback
+  and the connector refuses a certificate without a key. Don't add one back.
+- **`Keen.ConsumerData` goes to the browser** — it has no `refreshToken` on purpose.
+- **Never forward a Keen reply to the browser raw.** Use `clientEnvelope` /
+  `clientReply` / `publicMessage` (`utils/upstream-reply.ts`); Keen errors can carry
+  database internals.
+- **The proxy guards every `/api/*` call first** (`proxy/api/request-guard.ts`):
+  cross-site unsafe methods → 403, and the per-IP limits in
+  `configs/rate-limit.config.ts` → 429. Single-node, like the EventBus. A new
+  brute-forceable or email-sending route gets a limit there.
+- **One password rule** lives in `@schema/password.ts`, for new passwords only.
+  Login checks presence, never strength.
+- **Log statuses, not bodies.** No token payloads, emails or upstream bodies in logs.
+- **`TRUSTED_PROXY_HOPS` = how many proxies append to X-Forwarded-For.** 1 (default) for
+  ngrok, nginx and Cloud Run (measured: it appends exactly the client IP); 2 behind an
+  external HTTPS load balancer. Too high a value keys on a spoofable client-sent entry.
 
 ## Secrets
 

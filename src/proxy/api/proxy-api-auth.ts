@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_CONFIG } from '@/configs/api.config';
 import { apiError } from './api-error';
+import { waitForAppReady } from '@/utils/demo';
 
 export async function proxyApiAuth(request: NextRequest, pathname: string) {
     const URLs = Object.values(API_CONFIG).map(({ URL }) => URL);
@@ -15,7 +16,8 @@ export async function proxyApiAuth(request: NextRequest, pathname: string) {
     // this point drives the connector, so refuse once here instead of letting each
     // handler rediscover it. /api/logout is exempt by virtue of being short-
     // circuited upstream in proxy-api.ts: signing out must work while Keen is down.
-    if (!globalThis.__keenConnector?.isReady) {
+    // A cold start holds the call until the connector has booted (utils/demo.ts).
+    if (!(await waitForAppReady())) {
         return apiError(503, 'Keen connection is not ready.');
     }
 

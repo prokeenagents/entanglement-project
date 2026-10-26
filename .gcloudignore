@@ -1,0 +1,10 @@
+# What `gcloud run deploy --source` must NOT upload to Cloud Build. Explicit on
+# purpose — without this file gcloud only skips these by way of .gitignore.
+.gcloudignore
+.git
+.gitignore
+.env*
+.next
+node_modules
+*.log
+#!include:.gitignore

@@ -1,5 +1,9 @@
-import { Button, Container, Text } from '@chakra-ui/react';
+import { Button } from '@chakra-ui/react';
 import Link from 'next/link';
+import { LuShieldAlert, LuShieldCheck } from 'react-icons/lu';
+
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageContainer } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 
 import { getKeen } from '@/service/services/keen/keen';
@@ -7,12 +11,16 @@ import { getAccessToken } from '@/utils/cookies';
 
 const INVALID = 'This password-change link is invalid or has expired. Start again from your account page.';
 
-function Panel({ message, children }: { message: string; children: React.ReactNode }) {
+function Panel({ message, children, success }: { message: string; children: React.ReactNode; success?: boolean }) {
     return (
-        <Container maxW="3xl" py={20}>
-            <Text mb={4}>{message}</Text>
-            {children}
-        </Container>
+        <PageContainer maxW="xl">
+            <EmptyState
+                icon={success ? <LuShieldCheck size={22} /> : <LuShieldAlert size={22} />}
+                title={success ? 'Password changed' : "This link can't be used"}
+                description={message}
+                action={children}
+            />
+        </PageContainer>
     );
 }
 
@@ -55,7 +63,7 @@ export default async function Page({ params }: { params: Promise<{ hash: string 
 
     if (redeem && (redeem as { success?: boolean }).success === true) {
         return (
-            <Panel message="Your password has been changed.">
+            <Panel success message="Your password has been changed. Use it the next time you sign in.">
                 <Button asChild>
                     <Link href="/user">Back to account</Link>
                 </Button>

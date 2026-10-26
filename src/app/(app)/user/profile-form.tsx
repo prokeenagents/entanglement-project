@@ -126,7 +126,7 @@ export function ProfileForm({ profile }: { profile: Keen.ConsumerProfile | null 
 
             <form onSubmit={handleSubmit(onSubmit)}>
                 <HStack w="100%" justifyContent="center" align="center">
-                    <VStack gap="4" w="450px">
+                    <VStack gap="4" w="full" align="stretch">
                         <Stack w="full" gap="2">
                             <Field.Root invalid={!!errors.firstName} gap="0">
                                 <Field.Label>
@@ -220,7 +220,7 @@ export function ProfileForm({ profile }: { profile: Keen.ConsumerProfile | null 
                                 </Alert.Root>
                             )}
 
-                            <Button type="submit" disabled={!canSave || isSubmitting} loading={isSubmitting} loadingText="Saving">
+                            <Button type="submit" alignSelf="flex-start" mt="2" disabled={!canSave || isSubmitting} loading={isSubmitting} loadingText="Saving">
                                 {isSubmitting && <Spinner size="sm" />}
                                 <Text as="span">Save changes</Text>
                             </Button>

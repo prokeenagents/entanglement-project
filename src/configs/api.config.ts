@@ -69,6 +69,10 @@ export const AUTH_API_CONFIG = {
     },
     AGENT_FRONT_SETTINGS: {
         URL: '/api/agent-front-settings'
+    },
+    /** Dictation: the composer's recording → ElevenLabs Scribe → text (signed-in only). */
+    SPEECH_TO_TEXT: {
+        URL: '/api/speech-to-text'
     }
 };
 

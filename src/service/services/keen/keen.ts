@@ -1,4 +1,5 @@
 import KeenConnector from './keen.connector';
+import { MIN_WEBHOOK_SECRET_LENGTH } from '@/utils/webhook-secret';
 
 /**
  * Single source of the Keen connector across the whole Next process.
@@ -40,7 +41,8 @@ function readKeenConfig(): Keen.Connector {
         ['KEEN_CLIENT_ID', config.CLIENT_ID],
         ['KEEN_CLIENT_SECRET', config.CLIENT_SECRET],
         ['KEEN_API_KEY_ID', config.API_KEY_ID],
-        ['KEEN_API_KEY_SECRET', config.API_KEY_SECRET]
+        ['KEEN_API_KEY_SECRET', config.API_KEY_SECRET],
+        ['KEEN_WEBHOOK_SECRET', process.env.KEEN_WEBHOOK_SECRET ?? '']
     ]
         .filter(([, value]) => !value)
         .map(([name]) => name);
@@ -49,7 +51,30 @@ function readKeenConfig(): Keen.Connector {
         throw new Error(`Keen config missing from the environment: ${missing.join(', ')}. Copy .env.example → .env.local and fill it in.`);
     }
 
+    if ((process.env.KEEN_WEBHOOK_SECRET ?? '').length < MIN_WEBHOOK_SECRET_LENGTH) {
+        throw new Error(`KEEN_WEBHOOK_SECRET must be at least ${MIN_WEBHOOK_SECRET_LENGTH} characters. Generate one with: openssl rand -hex 32`);
+    }
+
+    // A bare host ("keen.example.com") makes every fetch fail and the site sits
+    // in maintenance with no error, so insist on a full http(s) URL up front.
+    assertHttpUrl('KEEN_HOST', config.KEEN_HOST);
+    assertHttpUrl('KEEN_ORIGIN', config.ORIGIN);
+
     return config;
+}
+
+function assertHttpUrl(name: string, value: string): void {
+    let protocol = '';
+
+    try {
+        protocol = new URL(value).protocol;
+    } catch {
+        // falls through to the throw below
+    }
+
+    if (protocol !== 'https:' && protocol !== 'http:') {
+        throw new Error(`${name} must be a full URL with its scheme, e.g. https://keen.example.com (got "${value}").`);
+    }
 }
 
 /** The one shared KeenConnector. Created on first call, reused thereafter. */

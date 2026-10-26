@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/utils/cookies';
+import { isDemoMode } from '@/utils/demo';
 
 /**
  * Evaluate the session from the httpOnly cookies set at login:
@@ -16,6 +17,11 @@ import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/utils/cookies';
  * signed them. No key yet (cert not delivered) → nothing verifies → logged out.
  */
 export async function checkLogin(request: NextRequest): Promise<App.Session.State> {
+    // Demo mode: everyone is the fixture consumer (dev-only — see utils/demo.ts).
+    if (isDemoMode()) {
+        return { authorized: true, authenticated: true };
+    }
+
     const publicKey = globalThis.__keenConnector?.publicKey;
 
     if (!publicKey) {
@@ -48,6 +54,10 @@ async function isValidJwt(token: string | undefined, publicKey: CryptoKey): Prom
 }
 
 export function checkPageAvailability() {
+    if (isDemoMode()) {
+        return true;
+    }
+
     const ready = globalThis.__keenConnector?.isReady || false;
 
     if (!ready) {

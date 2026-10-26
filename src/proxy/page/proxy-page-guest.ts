@@ -4,9 +4,14 @@
  */
 import { PAGE_CONFIG, GUEST_PAGE_CONFIG } from '@/configs/page.config';
 import { NextRequest, NextResponse } from 'next/server';
+import { isAppReady, waitForAppReady } from '@/utils/demo';
 
 export async function proxyPageGuest(request: NextRequest, pathname: string) {
-    if (!globalThis.__keenConnector?.isReady) {
+    // A cold start holds the request until the connector has booted (utils/demo.ts);
+    // the maintenance page itself is answered at once.
+    const ready = pathname === PAGE_CONFIG.MAINTENANCE.URL ? isAppReady() : await waitForAppReady();
+
+    if (!ready) {
         if (pathname === PAGE_CONFIG.MAINTENANCE.URL) {
             return NextResponse.next();
         }
@@ -14,7 +19,7 @@ export async function proxyPageGuest(request: NextRequest, pathname: string) {
         return NextResponse.redirect(new URL(`${PAGE_CONFIG.MAINTENANCE.URL}`, request.url));
     }
 
-    if (globalThis.__keenConnector?.isReady) {
+    if (ready) {
         if (pathname === PAGE_CONFIG.MAINTENANCE.URL) {
             return NextResponse.redirect(new URL(`/`, request.url));
         }

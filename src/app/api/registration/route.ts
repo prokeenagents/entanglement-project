@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { wireSchema } from '@/@schema/registration';
 import { PAGE_CONFIG } from '@/configs/page.config';
+import { clientEnvelope, isDuplicateAccount } from '@/utils/upstream-reply';
 
 /**
  * POST /api/registration
@@ -20,6 +21,8 @@ import { PAGE_CONFIG } from '@/configs/page.config';
  * nodejs runtime so it sees the globalThis.__keenConnector singleton.
  */
 export const runtime = 'nodejs';
+
+const DUPLICATE_ACCOUNT = 'An account with this email address already exists. Sign in, or use “Forgot password?” if you don’t remember the password.';
 
 export async function POST(req: NextRequest) {
     try {
@@ -50,7 +53,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, status: 502, message: 'Upstream did not return a valid response.' }, { status: 502 });
         }
 
-        return NextResponse.json(result);
+        if ((result as { success?: unknown }).success === true) {
+            return NextResponse.json({ success: true, status: 200, message: 'Success' });
+        }
+
+        // Never forward Keen's raw refusal: it can be a database error naming tables
+        // and constraints. A known duplicate gets a clear answer; anything else is
+        // reduced to a short, safe message.
+        if (isDuplicateAccount(result)) {
+            return NextResponse.json({ success: false, status: 409, message: DUPLICATE_ACCOUNT }, { status: 409 });
+        }
+
+        const envelope = clientEnvelope(result, 'We could not start your registration. Please check your details and try again.');
+
+        return NextResponse.json(envelope, { status: envelope.status >= 500 ? 502 : 400 });
     } catch (err) {
         console.log(`[registration] Error: ${(err as Error).message}`);
         return NextResponse.json({ success: false, status: 500, message: 'Internal error.' }, { status: 500 });

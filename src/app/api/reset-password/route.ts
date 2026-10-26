@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { formSchema } from '@/@schema/reset-password';
 import { PAGE_CONFIG } from '@/configs/page.config';
+import { clientEnvelope } from '@/utils/upstream-reply';
 
 /**
  * POST /api/reset-password
@@ -70,7 +71,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, status: 502, message: 'Upstream did not return a valid response.' }, { status: 502 });
         }
 
-        return NextResponse.json(result);
+        if ((result as { success?: unknown }).success === true) {
+            return NextResponse.json({ success: true, status: 200, message: 'Success' });
+        }
+
+        const envelope = clientEnvelope(result, 'We could not start the password reset. Please try again.');
+
+        return NextResponse.json(envelope, { status: envelope.status >= 500 ? 502 : 400 });
     } catch (err) {
         console.log(`[reset-password] Error: ${(err as Error).message}`);
         return NextResponse.json({ success: false, status: 500, message: 'Internal error.' }, { status: 500 });

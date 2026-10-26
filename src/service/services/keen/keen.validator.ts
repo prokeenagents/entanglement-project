@@ -1,3 +1,5 @@
+import { isValidNewPassword } from '@/@schema/password';
+
 export default class KeenValidator {
     static validateEmail(email: string) {
         if (!email) {
@@ -11,15 +13,21 @@ export default class KeenValidator {
         }
     }
 
+    /** A NEW password (registration / reset / change) — the shared rule in @schema/password. */
     static validatePassword(password: string) {
         if (!password) {
             throw new Error('Password must be valid string.');
         }
 
-        const REGEX = /^(?=.*\d)(?=.*[A-Z])(?=.*[a-z]).{8,}$/;
-
-        if (!REGEX.test(password)) {
+        if (!isValidNewPassword(password)) {
             throw new Error('The password is not valid format!');
+        }
+    }
+
+    /** A login password: only presence. Older accounts may predate the current rule. */
+    static validateLoginPassword(password: string) {
+        if (!password) {
+            throw new Error('Password must be valid string.');
         }
     }
 

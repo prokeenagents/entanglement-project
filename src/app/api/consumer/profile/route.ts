@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken } from '@/utils/cookies';
+import { clientReply } from '@/utils/upstream-reply';
 
 /**
  * GET /api/consumer/profile — two-token bridge to Keen's consumer profile read.
@@ -28,5 +29,5 @@ export async function GET() {
         return NextResponse.json({ success: false, message: 'Keen is unavailable.' }, { status: 502 });
     }
 
-    return NextResponse.json(reply);
+    return NextResponse.json(clientReply(reply));
 }

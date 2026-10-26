@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken } from '@/utils/cookies';
+import { clientReply } from '@/utils/upstream-reply';
 
 /**
  * GET /api/chat/list
@@ -27,5 +28,5 @@ export async function GET() {
         return NextResponse.json({ success: false, status: 502, message: 'Keen is unavailable.' }, { status: 502 });
     }
 
-    return NextResponse.json(reply);
+    return NextResponse.json(clientReply(reply));
 }

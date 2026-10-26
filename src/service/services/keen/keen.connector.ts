@@ -7,6 +7,12 @@ import KeenCache from './keen.cache';
 import KeenFrontSettings from './keen.front-settings';
 import { seal as sealPayload, open as openPayload } from './keen.crypto';
 
+/** tryActivate polls every 2s; this many polls without a certificate (≈16s) → redeem again. */
+const CERTIFICATE_REDEEM_EVERY_ATTEMPTS = 8;
+
+/** How long after a certificate redeem the webhook may deliver the r_cert material. */
+const CERTIFICATE_WINDOW_MS = 60_000;
+
 export default class KeenConnector {
     private active: boolean = false;
     private connecting: boolean = false;
@@ -17,6 +23,10 @@ export default class KeenConnector {
     private keenCertificate: string = '';
     private keenSecretKey: string = '';
     private joseKey: CryptoKey | null = null;
+    private activated: boolean = false;
+    private certificateWaiter: (() => void) | null = null;
+    /** Epoch ms until which r_cert material from the webhook is accepted (0 = not expecting any). */
+    private certificateExpectedUntil: number = 0;
 
     /**
      * Namespaces
@@ -51,6 +61,17 @@ export default class KeenConnector {
         return this.active;
     }
 
+    /**
+     * True once the boot sequence has finished — token, certificate AND the first
+     * contract / policy / space-list reads. `isReady` turns true BEFORE those reads
+     * (they are gated on it), so a page rendered in between would see an empty space
+     * list; the proxy waits for this instead (utils/demo.ts). A WAKE reconnect keeps it:
+     * the current certificate stays in use until the new one lands.
+     */
+    get isActivated(): boolean {
+        return this.activated;
+    }
+
     get cache(): KeenCache {
         return this.Cache;
     }
@@ -73,9 +94,7 @@ export default class KeenConnector {
      * algorithm Keen uses, so a payload sealed here opens on the Keen side (and
      * vice versa). `purpose` must match the far side ('token' | 'otp').
      *
-     * NOTE: when `keenSecretKey` is '' (no secret provisioned) this falls back to a
-     * fixed weak default — obfuscation, not confidentiality. Gate real secrets on
-     * `secretKey` being non-empty if that matters to the caller.
+     * Throws when no secret is provisioned — there is no weak default to fall back on.
      */
     seal(plaintext: string, purpose: string = 'token'): string {
         return sealPayload(plaintext, this.keenSecretKey, purpose);
@@ -128,14 +147,44 @@ export default class KeenConnector {
     }
 
     /**
-     * Store both halves the r_cert redeem delivers. `secretKey` is the shared
-     * symmetric key and defaults to '' — an admin may leave it unset, and the
-     * r_cert_delete path clears the certificate by calling this with no arguments.
+     * Store both halves the r_cert redeem delivers. The r_cert_delete path clears
+     * the certificate by calling this with no arguments.
+     *
+     * A certificate WITHOUT a shared secret is refused. Keen falls back to a fixed,
+     * public default key when the admin leaves the secret empty, so every sealed
+     * session, OTP and registration hash (argon password included) would open for
+     * anyone. Better to stay in maintenance and say why than to run on that.
      */
-    async setCertificate(cert: string, secretKey: string = '') {
+    async setCertificate(cert: string = '', secretKey: string = '') {
+        if (cert && !secretKey) {
+            console.error(
+                '[keen] Certificate REFUSED: it has no shared secret key. In the Keen admin open API Keys → Certificates, Generate a secret key on this certificate, then press Wake on the api key.'
+            );
+            cert = '';
+        }
+
         this.keenCertificate = cert;
-        this.keenSecretKey = secretKey;
+        this.keenSecretKey = cert ? secretKey : '';
         await this.createJoseInstance();
+        this.certificateWaiter?.();
+    }
+
+    /**
+     * The webhook's entry point for r_cert material. Only accepted while a redeem
+     * this connector started is still outstanding (see `redeemCertificate`), and
+     * only once per redeem — certificate material arriving at any other time is
+     * unsolicited and dropped, whoever sent it. Returns whether it was taken.
+     */
+    async acceptCertificate(cert: string, secretKey: string): Promise<boolean> {
+        if (Date.now() > this.certificateExpectedUntil) {
+            console.warn('[keen] Unsolicited certificate material ignored: no certificate redeem is outstanding.');
+            return false;
+        }
+
+        this.certificateExpectedUntil = 0;
+        await this.setCertificate(cert, secretKey);
+
+        return this.keenCertificate !== '';
     }
 
     /**
@@ -181,19 +230,42 @@ export default class KeenConnector {
         });
     }
 
-    private resetProps() {
-        this.active = false;
-        this.connecting = false;
-        this.claimCertificateCode = '';
-        this.redeemedCertificateCode = false;
-        this.keenCertificate = '';
-        this.keenSecretKey = '';
-        this.joseKey = null;
+    /**
+     * Re-run the handshake after a WAKE (r_api_keys). The current application token,
+     * certificate and secret stay in use until their replacements land, so a WAKE no
+     * longer drops the site into maintenance while it waits for the next r_cert.
+     */
+    async reconnect(): Promise<void> {
+        await this.renewApplicationToken();
+        await this.refreshCertificate();
+
+        await this.tryActivate(async () => {
+            await this.resources.getConsumerContract();
+            await this.resources.getConsumerPolicy();
+            await this.resources.getSpaceList();
+        });
     }
 
-    async reconnect(): Promise<void> {
-        this.resetProps();
-        await this.connect();
+    /**
+     * Claim + redeem a fresh certificate code (the r_cert notice). The old codes
+     * must be cleared first: fetchCertificateRetrier loops only while they are
+     * empty, so without this a re-fetch silently did nothing.
+     */
+    async refreshCertificate(): Promise<void> {
+        this.claimCertificateCode = '';
+        this.redeemedCertificateCode = false;
+        await this.fetchCertificateRetrier();
+    }
+
+    /** Fetch a new application token in place, retrying every 2s, keeping the old one meanwhile. */
+    private async renewApplicationToken(): Promise<void> {
+        let attempt = 0;
+
+        while (!(await this.fetchApplicationToken())) {
+            attempt++;
+            console.warn(`[keen] application_token renewal attempt ${attempt} failed — retrying in 2s`);
+            await this.delay(2000);
+        }
     }
 
     private async tryActivate(callback?: () => Promise<void>) {
@@ -202,16 +274,51 @@ export default class KeenConnector {
             while (!this.keenCertificate || !this.applicationToken) {
                 attempt++;
                 console.log(`[BOOT] Application activated: FALSE. Retrying in 2s. (attempt ${attempt})`);
-                await this.delay(2000);
+                await this.waitForCertificate(2000);
+
+                // The certificate only ever arrives by webhook. While a new Cloud Run
+                // revision rolls out, the OLD one still owns the public URL, so the r_cert
+                // POST answering THIS instance's redeem can land there and this loop would
+                // wait forever. No certificate after ~16s → claim and redeem a fresh code.
+                if (attempt % CERTIFICATE_REDEEM_EVERY_ATTEMPTS === 0 && this.applicationToken && !this.keenCertificate) {
+                    console.warn(`[keen] No certificate after ${attempt * 2}s — redeeming a fresh code`);
+                    await this.refreshCertificate();
+                }
             }
         } finally {
             this.active = true;
-            if (callback) {
-                await callback();
+            try {
+                if (callback) {
+                    await callback();
+                }
+            } finally {
+                // Boot is over — caches loaded, or a read failed and the webhooks will
+                // refill them. Either way the proxy stops holding requests here.
+                this.activated = true;
             }
         }
 
         console.log(`[BOOT] Application activated: ${this.active}`);
+    }
+
+    /**
+     * Wait up to `ms` for a certificate, waking the moment setCertificate() stores
+     * one. On a cold start the first visitor is held until boot finishes, so the r_cert
+     * webhook must not sit up to 2s unnoticed.
+     */
+    private waitForCertificate(ms: number): Promise<void> {
+        return new Promise(resolve => {
+            const timer = setTimeout(() => {
+                this.certificateWaiter = null;
+                resolve();
+            }, ms);
+
+            this.certificateWaiter = () => {
+                clearTimeout(timer);
+                this.certificateWaiter = null;
+                resolve();
+            };
+        });
     }
 
     async fetchApplicationToken() {
@@ -252,9 +359,13 @@ export default class KeenConnector {
                 };
             };
 
-            const token = !!obj.result && obj.result.access_token ? obj.result.access_token : '';
+            const token = !!obj.result && typeof obj.result.access_token === 'string' ? obj.result.access_token : '';
 
-            this.applicationToken = typeof token === 'string' ? token : '';
+            if (!token) {
+                return false;
+            }
+
+            this.applicationToken = token;
 
             return true;
         } catch (err) {
@@ -419,6 +530,10 @@ export default class KeenConnector {
                 code: this.claimCertificateCode
             });
 
+            // Open the acceptance window BEFORE the request: Keen may post the r_cert
+            // webhook before this response comes back.
+            this.certificateExpectedUntil = Date.now() + CERTIFICATE_WINDOW_MS;
+
             const result = await fetch(url, {
                 method: 'POST',
                 headers,
@@ -436,9 +551,11 @@ export default class KeenConnector {
                 return false;
             }
 
-            console.log(`[BOOT] Certificate redeem → HTTP ${result.status}`, data);
+            // Status only — the body is the platform's reply about tenant key material.
+            console.log(`[BOOT] Certificate redeem → HTTP ${result.status}`);
 
-            if (!result.ok) {
+            if (!result.ok || !data) {
+                this.certificateExpectedUntil = 0;
                 this.redeemedCertificateCode = false;
                 return false;
             }

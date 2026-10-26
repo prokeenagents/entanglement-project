@@ -5,7 +5,8 @@ import { SubmitHandler, useForm } from 'react-hook-form';
 
 import { generatePasswordHookFormPayload } from '@/@schema/account-password';
 import { AUTH_API_CONFIG } from '@/configs/api.config';
-import { Alert, Button, Field, Heading, Input, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Alert, Button, Field, Input, Spinner, Stack, Text } from '@chakra-ui/react';
+import { PASSWORD_HINT } from '@/@schema/password';
 
 /**
  * The "change password" form — the SECOND form on the /user account page.
@@ -50,7 +51,6 @@ export function PasswordForm() {
     if (sent) {
         return (
             <Stack gap={3}>
-                <Heading size="lg">Change password</Heading>
                 <Alert.Root status="success">
                     <Alert.Indicator />
                     <Alert.Title>Check your email — we sent a link to confirm your new password. It isn&apos;t changed until you follow it.</Alert.Title>
@@ -61,11 +61,6 @@ export function PasswordForm() {
 
     return (
         <Stack gap={4}>
-            <Heading size="lg">Change password</Heading>
-            <Text color="fg.muted" fontSize="sm">
-                Enter a new password — we&apos;ll email you a link to confirm the change.
-            </Text>
-
             <form onSubmit={handleSubmit(onSubmit)}>
                 <Stack gap={4}>
                     <Field.Root invalid={!!errors.password} gap="0">
@@ -74,6 +69,7 @@ export function PasswordForm() {
                         </Field.Label>
                         <Input type="password" autoComplete="new-password" {...register('password')} disabled={isSubmitting} />
                         <Field.ErrorText>{errors.password?.message}</Field.ErrorText>
+                        {!errors.password && <Field.HelperText mt="1">{PASSWORD_HINT}</Field.HelperText>}
                     </Field.Root>
 
                     <Field.Root invalid={!!errors.confirmPassword} gap="0">
@@ -91,7 +87,7 @@ export function PasswordForm() {
                         </Alert.Root>
                     )}
 
-                    <Button type="submit" disabled={isSubmitting} loading={isSubmitting} loadingText="Sending">
+                    <Button type="submit" alignSelf="flex-start" mt="2" disabled={isSubmitting} loading={isSubmitting} loadingText="Sending">
                         {isSubmitting && <Spinner size="sm" />}
                         <Text as="span">Email me a reset link</Text>
                     </Button>

@@ -1,9 +1,11 @@
-import { Button, Container, Text } from '@chakra-ui/react';
-import Link from 'next/link';
+import { StatusCard } from '@/components/ui/status-card';
 import { redirect } from 'next/navigation';
 import { checkPageAvailability } from '@/utils/auth';
 import { getKeen } from '@/service/services/keen/keen';
 import { PAGE_CONFIG } from '@/configs/page.config';
+
+// checkPageAvailability() reads the live Keen connector — never prerender this page.
+export const dynamic = 'force-dynamic';
 
 const INVALID_OR_EXPIRED = 'This password reset link is invalid or has expired. Please request a new one.';
 
@@ -12,14 +14,7 @@ const INVALID_OR_EXPIRED = 'This password reset link is invalid or has expired. 
  * which is client-only) so it renders inside this async SERVER component.
  */
 function ErrorPanel({ message }: { message: string }) {
-    return (
-        <Container maxW="3xl" py={20}>
-            <Text mb={4}>{message}</Text>
-            <Button asChild variant="plain">
-                <Link href={PAGE_CONFIG.LOGIN.URL}>Go Back</Link>
-            </Button>
-        </Container>
-    );
+    return <StatusCard tone="error" title="This link can't be used" message={message} actionLabel="Back to sign in" actionHref={PAGE_CONFIG.LOGIN.URL} />;
 }
 
 /**

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { PASSWORD_HINT, isValidNewPassword } from '@/@schema/password';
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken } from '@/utils/cookies';
+import { publicMessage } from '@/utils/upstream-reply';
 
 /**
  * POST /api/consumer/reset-password  —  body: { password }
@@ -34,8 +36,8 @@ export async function POST(request: NextRequest) {
 
     const password = typeof body.password === 'string' ? body.password : '';
 
-    if (password.length < 8) {
-        return NextResponse.json({ success: false, message: 'Password must be at least 8 characters.' }, { status: 400 });
+    if (!isValidNewPassword(password)) {
+        return NextResponse.json({ success: false, message: PASSWORD_HINT }, { status: 400 });
     }
 
     const keen = getKeen();
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ok = 'success' in reply && reply.success === true;
-    const message = 'success' in reply ? reply.message : Array.isArray(reply.message) ? reply.message.join(', ') : reply.error;
+    const message = publicMessage('success' in reply ? reply.message : (reply.message ?? reply.error), 'The change could not be saved. Please try again.');
 
     return NextResponse.json({ success: ok, message }, { status: ok ? 200 : 400 });
 }

@@ -5,7 +5,7 @@ import { RegistrationForm } from './components/forms/registration';
 
 export default function Content() {
     return (
-        <VStack minH="dvh" minW="dvw" bg="grey.200" alignItems="center" justifyContent="center">
+        <VStack w="full" alignItems="center" justifyContent="center">
             <RegistrationForm />
         </VStack>
     );

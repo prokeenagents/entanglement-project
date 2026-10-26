@@ -1,0 +1,10 @@
+# Keep secrets and local leftovers out of the image build context. `.env*` is the
+# one that matters: Next copies `.env` / `.env.production` into .next/standalone,
+# so a local env file in the context would ship inside the image.
+.env*
+.git
+.next
+node_modules
+*.log
+.vscode
+cli

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken } from '@/utils/cookies';
+import { clientReply } from '@/utils/upstream-reply';
 
 /**
  * POST /api/chat/delete  —  body: { chatId }
@@ -39,5 +40,5 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, status: 502, message: 'Keen is unavailable.' }, { status: 502 });
     }
 
-    return NextResponse.json(reply);
+    return NextResponse.json(clientReply(reply));
 }

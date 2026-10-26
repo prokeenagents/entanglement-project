@@ -1,14 +1,13 @@
-import { Container, Text } from '@chakra-ui/react';
+import { StatusCard } from '@/components/ui/status-card';
 import Content from './content';
 import { checkPageAvailability } from '@/utils/auth';
 
+// checkPageAvailability() reads the live Keen connector — never prerender this page.
+export const dynamic = 'force-dynamic';
+
 export default function Page() {
     if (!checkPageAvailability()) {
-        return (
-            <Container maxW="3xl" py={20}>
-                <Text>We are a little busy at the moment</Text>
-            </Container>
-        );
+        return <StatusCard tone="maintenance" title="We're a little busy" message="Sign-up is temporarily unavailable. Please try again in a moment." actionLabel="Try again" reload />;
     }
 
     return <Content />;

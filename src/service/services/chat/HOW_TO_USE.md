@@ -20,7 +20,7 @@ import ChatAPI from './api';
 const chat = new ChatAPI({
     spaceID:     'test-space',
     agentID:     'agent-one',
-    userId:      'cmnbrajfm0000mz7wd39jj0r9',
+    userId:      '<consumer-id>',
     email:       'consumer@example.com',
     accessToken: '<consumer-jwt>'   // a REAL consumer access_token (verified per message)
     // url defaults to CHAT_SETTINGS.WS_URL, projectID defaults to spaceID — see settings.ts.
@@ -51,7 +51,7 @@ One full conversation turn. The rest of this doc explains each step and what to 
 const chat = new ChatAPI({
     spaceID:     'test-space',
     agentID:     'agent-one',
-    userId:      'cmnbrajfm0000mz7wd39jj0r9',
+    userId:      '<consumer-id>',
     email:       'consumer@example.com',
     accessToken: '<consumer-jwt>'   // a REAL consumer access_token (verified per message)
     // url defaults to CHAT_SETTINGS.WS_URL, projectID defaults to spaceID — see settings.ts.

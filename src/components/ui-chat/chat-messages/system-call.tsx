@@ -1,13 +1,10 @@
-'use client';
-
-import { Badge, Box, HStack, Stack, Text } from '@chakra-ui/react';
-
 /**
  * Agent output is a plain token stream — the orchestrator LLM writes its tool
  * directives INTO its own text as a `<SYSTEM CALL>…</SYSTEM CALL>` fence, which
  * the flow engine parses to route to the tool flow. The relay forwards those
  * tokens verbatim, so without this the fence shows up as raw markup in the
- * bubble. This module turns each fence into a labelled chip and leaves the prose
+ * bubble. This module splits each fence out as a structured tool call (rendered
+ * as a step in the run trace — see turns.ts / run-trace.tsx) and leaves the prose
  * around it untouched.
  *
  * The fence body carries `!*`-prefixed fields:
@@ -23,9 +20,7 @@ import { Badge, Box, HStack, Stack, Text } from '@chakra-ui/react';
 const OPEN = '<SYSTEM CALL>';
 const CLOSE = '</SYSTEM CALL>';
 
-type Segment =
-    | { kind: 'text'; text: string }
-    | { kind: 'tool'; action: string; tool: string; context: string; streaming: boolean };
+type Segment = { kind: 'text'; text: string } | { kind: 'tool'; action: string; tool: string; context: string; streaming: boolean };
 
 /**
  * Read one `!*<name>` field out of a fence body: everything from the marker up
@@ -93,58 +88,4 @@ export const parseAgentSegments = (text: string): Segment[] => {
     }
 
     return segments;
-};
-
-/** One tool-call directive, rendered as a chip instead of raw markup. */
-const ToolCallChip: React.FC<{ call: Extract<Segment, { kind: 'tool' }> }> = ({ call }) => (
-    <Box colorPalette="purple" borderWidth="1px" borderColor="border.emphasized" bg="bg.muted" borderRadius="md" px={3} py={2} w="full">
-        <HStack gap={2}>
-            <Badge colorPalette="purple" size="sm">
-                {call.streaming ? 'Tool call · running…' : 'Tool call'}
-            </Badge>
-            {call.tool && (
-                <Text fontSize="sm" fontWeight="semibold">
-                    {call.tool}
-                </Text>
-            )}
-            {call.action && (
-                <Text fontSize="xs" color="fg.muted">
-                    {call.action}
-                </Text>
-            )}
-        </HStack>
-
-        {call.context && (
-            <Text as="pre" mt={1} fontSize="xs" fontFamily="mono" color="fg.muted" whiteSpace="pre-wrap" wordBreak="break-word">
-                {call.context}
-            </Text>
-        )}
-    </Box>
-);
-
-/**
- * The body of an `agent` bubble: prose rendered as text, `<SYSTEM CALL>` fences
- * rendered as chips. Not memoized — MessageRow's memo already gates this on the
- * message reference, so only the row whose text is actually growing re-parses.
- * Positional index is the correct key: segments only append/grow as tokens
- * stream in, so a given position keeps its identity across renders.
- */
-export const AgentBody: React.FC<{ text: string }> = ({ text }) => {
-    const segments = parseAgentSegments(text);
-
-    return (
-        <Stack gap={2} w="full">
-            {segments.map((segment, index) =>
-                segment.kind === 'tool' ? (
-                    <ToolCallChip key={index} call={segment} />
-                ) : (
-                    segment.text.trim() && (
-                        <Text key={index} whiteSpace="pre-wrap" wordBreak="break-word">
-                            {segment.text}
-                        </Text>
-                    )
-                )
-            )}
-        </Stack>
-    );
 };

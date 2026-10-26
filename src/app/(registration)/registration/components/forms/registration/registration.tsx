@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 
 import { formSchema, generateRegistrationHookFormPayload, toDob } from '@/@schema/registration';
-import { Box, Button, Field, Heading, HStack, Input, NativeSelect, Separator, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
+import { Button, Field, Heading, HStack, Input, NativeSelect, Separator, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { PAGE_CONFIG } from '@/configs/page.config';
 import { useLogin } from '@/hooks/login';
 import { CardShell } from '@/components/ui/card-shell';
-import { Logo } from '@/components/ui/logo';
+import { PASSWORD_HINT } from '@/@schema/password';
 
 const MONTHS = [
     { value: '1', label: 'January' },
@@ -79,7 +79,7 @@ export const Component: React.FC = () => {
     if (sent) {
         return (
             <HStack w="100%" justifyContent="center" align="center">
-                <VStack gap="4" w="450px" align="stretch">
+                <VStack gap="4" w="full" align="stretch">
                     <Heading size="2xl" mb={2}>
                         Check your inbox
                     </Heading>
@@ -98,21 +98,10 @@ export const Component: React.FC = () => {
 
     return (
         <VStack gap="8">
-            <HStack gap="1">
-                <Logo />
-                <VStack gap="0" alignItems="flex-start">
-                    <Text fontSize="sm" color="cyan.700" lineHeight="1.2">
-                        <strong>Entanglement</strong>
-                    </Text>
-                    <Text fontSize="xs" color="cyan.700" opacity="0.75" lineHeight="1.2">
-                        Project
-                    </Text>
-                </VStack>
-            </HStack>
-            <CardShell title="Sign Up" description="Fill in the form below to create an account.">
+            <CardShell title="Create your account" description="Fill in the form below to get started." width={520}>
                 <form action="/" onSubmit={handleSubmit(onSubmit)}>
                     <HStack w="100%" justifyContent="center" align="center">
-                        <VStack gap="4" w="450px">
+                        <VStack gap="4" w="full">
                             <Stack w="full" gap="2">
                                 <Field.Root invalid={!!errors.email || !!errors.root} gap="0">
                                     <Field.Label>
@@ -132,6 +121,7 @@ export const Component: React.FC = () => {
                                     <Field.ErrorText>
                                         <Text as="span">{errors.password?.message}</Text>
                                     </Field.ErrorText>
+                                    {!errors.password && <Field.HelperText mt="1">{PASSWORD_HINT}</Field.HelperText>}
                                 </Field.Root>
 
                                 <Field.Root invalid={!!errors.confirmPassword || !!errors.root} gap="0">

@@ -1,190 +1,132 @@
 'use client';
 
-import { useState } from 'react';
-
-import { useConsumer } from '@/contexts/consumer';
-import { generateUUID } from '@/utils/global';
-import { Alert, Button, Card, Container, Editable, Heading, HStack, Separator, Stack, VStack } from '@chakra-ui/react';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Badge, Box, Button, HStack, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
+import { LuBot, LuMessageSquarePlus, LuMessagesSquare, LuSearch } from 'react-icons/lu';
+
+import { AgentAvatar } from '@/components/ui/agent-avatar';
+import { ChatNavItem } from '@/components/ui/app-shell';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageContainer, PageHeader } from '@/components/ui/page-header';
+import { Surface } from '@/components/ui/surface';
+import { useChatList } from '@/contexts/chat-list';
+import { useConsumer } from '@/contexts/consumer';
+import { newChatHref, spaceHref } from '@/utils/routes';
 
 /**
- * Client half of the home page. Holds everything that needs the browser —
- * the useLogin hook + the logout handler. `spaces` is read on the server (from
- * the keen cache, which only exists there) and handed down as a serializable
- * prop, so this component never touches getKeen().
+ * One agent: start a new conversation, or find, rename and delete an earlier one.
+ * The list is the shared ChatListProvider state, so edits here show up in the
+ * sidebar at the same time.
  */
 export const Content: React.FC<{
     spaceID: string;
     agentID: string;
-    chatList: Keen.ChatListItem[];
 }> = props => {
-    const { spaceID, agentID, chatList } = props;
+    const { spaceID, agentID } = props;
 
-    const consumer = useConsumer();
-    const spaces = consumer.consumerSpaces;
     const router = useRouter();
+    const consumer = useConsumer();
+    const { entries } = useChatList();
+    const [query, setQuery] = useState('');
 
-    const navigateToSpaces = () => {
-        router.push(`/`);
-    };
+    const space = consumer.consumerSpaces.find(s => s.id === spaceID);
+    const agent = space?.agents.find(a => a.id === agentID && a.active);
 
-    const navigateToAgent = () => {
-        router.push(`/space/${spaceID}`);
-    };
+    const chats = useMemo(() => {
+        const needle = query.trim().toLowerCase();
 
-    const startNewChat = () => {
-        const chatID = generateUUID();
-        router.push(`/space/${spaceID}/${agentID}/${chatID}`);
-    };
+        return entries.filter(entry => entry.agent?.id === agentID && (!needle || (entry.chat.title ?? '').toLowerCase().includes(needle)));
+    }, [entries, agentID, query]);
 
-    const startChat = (chatID: string) => {
-        router.push(`/space/${spaceID}/${agentID}/${chatID}`);
-    };
-
-    /**
-     * Local, optimistic copy of the server-fetched chat list so a delete drops the
-     * row immediately. The server list already excludes archived chats, so on the
-     * next mount this state and the server agree — no refresh needed.
-     */
-    const [chats, setChats] = useState(chatList);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    /**
-     * Archive a chat (soft-delete, owner-scoped upstream). Optimistic: on success
-     * drop the row; on failure keep it and surface the reason.
-     */
-    const deleteChat = async (chatId: string) => {
-        setDeletingId(chatId);
-        setError(null);
-
-        try {
-            const reply = await consumer.chat.delete(chatId);
-
-            if (reply.success) {
-                setChats(prev => prev.filter(c => c.chatId !== chatId));
-            } else {
-                setError(reply.message ?? 'Could not delete the chat.');
-            }
-        } catch {
-            setError('Could not delete the chat.');
-        } finally {
-            setDeletingId(null);
-        }
-    };
-
-    /**
-     * Persist a renamed title (double-click → edit → commit on Enter/blur). No-op
-     * when blank or unchanged from what's shown — the Editable's fallback preview is
-     * the chatId, so committing an untouched untitled chat must NOT save the id as a
-     * title. Optimistic: update local state on success so the new title sticks.
-     */
-    const renameChat = async (chatId: string, rawTitle: string) => {
-        const title = rawTitle.trim();
-        const current = chats.find(c => c.chatId === chatId);
-        const shown = current?.title || chatId;
-
-        if (!title || title === shown) {
-            return;
-        }
-
-        setError(null);
-
-        try {
-            const reply = await consumer.chat.setTitle(chatId, title);
-
-            if (reply.success) {
-                setChats(prev => prev.map(c => (c.chatId === chatId ? { ...c, title } : c)));
-            } else {
-                setError(reply.message ?? 'Could not rename the chat.');
-            }
-        } catch {
-            setError('Could not rename the chat.');
-        }
-    };
-
-    const space = spaces.find(s => s.id === spaceID);
-
-    if (!space) {
-        return <>This space does not exists or you dont have access to it.</>;
+    if (!space || !agent) {
+        return (
+            <PageContainer>
+                <EmptyState
+                    icon={<LuBot size={22} />}
+                    title="Agent not available"
+                    description="This agent doesn't exist, is disabled, or you don't have access to it."
+                    action={
+                        <Button asChild size="sm">
+                            <Link href={space ? spaceHref(space.id) : '/'}>{space ? `Back to ${space.title}` : 'Back to home'}</Link>
+                        </Button>
+                    }
+                />
+            </PageContainer>
+        );
     }
 
-    const agents = space.agents.filter(a => a.active);
-    if (!agents || !agents.length) {
-        return <>There is no available agents in this space.</>;
-    }
-
-    const agent = agents.find(a => a.id === agentID);
-    if (!agent) {
-        return <>This agent does not exists or you dont have access to it.</>;
-    }
+    const total = entries.filter(entry => entry.agent?.id === agentID).length;
+    const startNewChat = () => router.push(newChatHref(spaceID, agentID));
 
     return (
-        <Container maxW="3xl" py={20}>
-            <Stack gap={4}>
-                <Button colorPalette="blue" onClick={() => navigateToSpaces()}>
-                    Go to Spaces
-                </Button>
-                <Button colorPalette="blue" onClick={() => navigateToAgent()}>
-                    Go to Space Agents
-                </Button>
+        <PageContainer maxW="4xl">
+            <PageHeader
+                breadcrumbs={[{ label: 'Home', href: '/' }, { label: space.title, href: spaceHref(space.id) }, { label: agent.displayName }]}
+                media={<AgentAvatar name={agent.displayName} size={60} online />}
+                eyebrow={space.title}
+                title={agent.displayName}
+                description={
+                    <HStack as="span" gap="2" display="inline-flex">
+                        <Badge colorPalette="green" variant="subtle" size="sm">
+                            Available
+                        </Badge>
+                        <Text as="span">
+                            {total} {total === 1 ? 'conversation' : 'conversations'}
+                        </Text>
+                    </HStack>
+                }
+                actions={
+                    <Button onClick={startNewChat} boxShadow="glow">
+                        <LuMessageSquarePlus /> New conversation
+                    </Button>
+                }
+            />
 
-                <Separator w="full" />
+            {total === 0 ? (
+                <EmptyState
+                    icon={<LuMessagesSquare size={22} />}
+                    title={`No conversations with ${agent.displayName} yet`}
+                    description="Start one now — it will be saved here so you can come back to it any time."
+                    action={
+                        <Button onClick={startNewChat} size="sm">
+                            <LuMessageSquarePlus /> Start a conversation
+                        </Button>
+                    }
+                />
+            ) : (
+                <Stack gap="4">
+                    <HStack justify="space-between" gap="3" flexWrap="wrap">
+                        <Text fontSize="lg" fontWeight="600" letterSpacing="-0.01em">
+                            Conversations
+                        </Text>
+                        <InputGroup startElement={<LuSearch size={15} />} maxW={{ base: 'full', sm: '280px' }}>
+                            <Input size="sm" placeholder="Search by title" value={query} onChange={event => setQuery(event.target.value)} aria-label="Search conversations" bg="bg.glass" />
+                        </InputGroup>
+                    </HStack>
 
-                <Button colorPalette="blue" onClick={() => startNewChat()}>
-                    Start new conversation
-                </Button>
+                    <Surface p="1.5">
+                        {chats.length === 0 ? (
+                            <Text color="fg.muted" fontSize="sm" textAlign="center" py="8">
+                                No conversations match “{query}”.
+                            </Text>
+                        ) : (
+                            <Stack gap="0.5">
+                                {chats.map(entry => (
+                                    <ChatNavItem key={entry.chat.chatId} entry={entry} active={false} showAgent={false} showTime size="md" />
+                                ))}
+                            </Stack>
+                        )}
+                    </Surface>
 
-                <Separator w="full" />
-
-                {error && (
-                    <Alert.Root status="error">
-                        <Alert.Indicator />
-                        <Alert.Title>{error}</Alert.Title>
-                    </Alert.Root>
-                )}
-
-                {!chats.length && (
-                    <Alert.Root status="warning">
-                        <Alert.Indicator />
-                        <Alert.Title>
-                            No available chats with <strong>{agent.displayName}</strong>
-                        </Alert.Title>
-                    </Alert.Root>
-                )}
-
-                {chats.length > 0 && (
-                    <>
-                        <Heading>Chat List</Heading>
-                        <VStack w="full">
-                            {chats.map(chat => {
-                                return (
-                                    <Card.Root key={chat.chatId} w="full" size="sm">
-                                        <Card.Body>
-                                            <HStack>
-                                                {/* Double-click the title to rename; Enter/blur commits → setTitle. */}
-                                                <Editable.Root
-                                                    flex="1"
-                                                    defaultValue={chat.title || chat.chatId}
-                                                    activationMode="dblclick"
-                                                    onValueCommit={details => void renameChat(chat.chatId, details.value)}
-                                                >
-                                                    <Editable.Preview />
-                                                    <Editable.Input />
-                                                </Editable.Root>
-                                                <Button onClick={() => startChat(chat.chatId)}>Continue</Button>
-                                                <Button colorPalette="red" variant="outline" loading={deletingId === chat.chatId} onClick={() => void deleteChat(chat.chatId)}>
-                                                    Delete
-                                                </Button>
-                                            </HStack>
-                                        </Card.Body>
-                                    </Card.Root>
-                                );
-                            })}
-                        </VStack>
-                    </>
-                )}
-            </Stack>
-        </Container>
+                    <Box>
+                        <Text fontSize="xs" color="fg.subtle">
+                            Tip: use the ··· menu on a conversation to rename or delete it.
+                        </Text>
+                    </Box>
+                </Stack>
+            )}
+        </PageContainer>
     );
 };

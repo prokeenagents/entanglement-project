@@ -1,6 +1,9 @@
-import { Container, Text } from '@chakra-ui/react';
+import { StatusCard } from '@/components/ui/status-card';
 import Content from './content';
 import { checkPageAvailability } from '@/utils/auth';
+
+// checkPageAvailability() reads the live Keen connector — never prerender this page.
+export const dynamic = 'force-dynamic';
 
 /**
  * `searchParams` is a Promise in this Next. We read the one-time success flags the
@@ -10,11 +13,7 @@ import { checkPageAvailability } from '@/utils/auth';
  */
 export default async function Page({ searchParams }: { searchParams: Promise<{ reset?: string; registration?: string }> }) {
     if (!checkPageAvailability()) {
-        return (
-            <Container>
-                <Text>We are a little busy at the moment</Text>
-            </Container>
-        );
+        return <StatusCard tone="maintenance" title="We're a little busy" message="Sign-in is temporarily unavailable. Please try again in a moment." actionLabel="Try again" reload />;
     }
 
     const { reset, registration } = await searchParams;

@@ -1,6 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
+import { newPasswordSchema } from './password';
+
 /**
  * The logged-out "forgot password" claim.
  *
@@ -17,16 +19,13 @@ export const formSchema = z
             error: 'Invalid email'
         }),
 
-        password: z.string().min(8, {
-            error: 'Invalid password'
-        }),
+        password: newPasswordSchema,
 
-        confirmPassword: z.string().min(8, {
-            error: 'Invalid confirm password'
+        confirmPassword: z.string().min(1, {
+            error: 'Confirm your password'
         })
     })
-    // Without this the confirm field is decorative — each value only has to be 8+
-    // chars, so password/confirmPassword could differ and still validate. `path`
+    // Without this the confirm field is decorative — password/confirmPassword could differ and still validate. `path`
     // pins the error to the confirm field so it renders under it rather than as a
     // form-level root error. /api/reset-password re-parses with this same schema,
     // so the server enforces the match too — it isn't taking the client's word.

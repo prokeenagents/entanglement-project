@@ -17,7 +17,9 @@ wire is what a third-party partner's backend would do with an `api_key`, an
 | Language | TypeScript |
 | UI | Chakra UI v3 (emotion) — **no Tailwind, no shadcn/ui** |
 | Forms | react-hook-form + zod |
-| Icons | react-icons |
+| Icons | react-icons (Lucide set) |
+| Markdown | react-markdown + remark-gfm (agent answers; raw HTML off) |
+| Theme | `src/theme/*` — brand config + semantic tokens, dark/light via next-themes |
 | Crypto | `jose` (RS256 verify) + node `crypto` (AES-256-GCM) |
 
 ## Getting started
@@ -28,7 +30,17 @@ npm run dev-local   # TLS verification off — the Keen edge is https://localhos
 npm run dev         # plain dev, if your Keen edge has a trusted cert
 ```
 
-Both scripts open the Node inspector on `0.0.0.0:3210`.
+Both scripts open the Node inspector on `127.0.0.1:3210` (this machine only — the
+inspector gives full control of the process and its secrets, so never bind it to the LAN).
+
+**No Keen sandbox handy?** Run the UI against fixtures and a simulated agent:
+
+```bash
+ENTANGLEMENT_DEMO=1 npm run dev     # dev-only; ignored in production builds
+```
+
+To rebrand the app (logo, colors, button shapes, fonts, starter prompts) see
+[`CUSTOMIZING.md`](./CUSTOMIZING.md).
 
 The app must be reached on an **origin that is allow-listed on the Keen api_key**
 (see `ORIGIN` in `src/service/services/keen/keen.ts`). Hitting it on a different
@@ -44,7 +56,12 @@ false`, `keen.connector.ts`). Full setup:
 **1. Wire the api_key in the Keen admin.** For the partner api_key you'll use,
 bind a **client**, a **certificate** and a **consumer contract**, allow-list this
 app's public **origin**, and set the api_key's **webhook URL** to this site's
-`https://<public-host>/api/keen-webhook` — the inbound channel Keen POSTs to.
+`https://<public-host>/api/keen-webhook/<KEEN_WEBHOOK_SECRET>` — the inbound channel
+Keen POSTs to. Keen does not sign webhooks, so the secret in the URL is what keeps
+strangers from posting forged certificates or logouts; generate it with
+`openssl rand -hex 32` and put the same value in `.env.local`. The **certificate must
+have a shared secret key** (Certificates → Generate): the site refuses a certificate
+without one, because Keen would seal sessions with a public default key.
 
 **2. Expose the site with an ngrok tunnel** so the webhook can reach it:
 
@@ -79,9 +96,10 @@ npm run dev-local     # TLS verification off for the self-signed https://localho
 ```
 
 **5. WAKE it from the Keen admin** (the api_key's detail page → **Wake**). Keen
-POSTs to `/api/keen-webhook`:
+POSTs to `/api/keen-webhook/<secret>`:
 
-- `{ "synch-data": "r_cert", result: { cert, key } }` → `connector.setCertificate()`
+- `{ "synch-data": "r_cert", result: { cert, key } }` → `connector.acceptCertificate()`
+  (only while a certificate redeem the connector started is outstanding)
   — the public cert plus the shared secret it signs with; **the only channel that
   carries `key`**.
 - `{ "synch-data": ["r_api_keys", "r_consumer_policy", "r_json", …] }` → the
@@ -181,7 +199,7 @@ URL exactly and are prefix-allowed in `proxy-page-guest.ts` — `/set-password/`
 | `(login)` | `login` (+ OTP), `reset-password`, `set-password/[hash]` |
 | `(registration)` | `registration`, `confirmation/[hash]` |
 | `(maintanance)` | Shown when the connector isn't ready |
-| `(not-found)` | Catch-all |
+| `global-not-found.tsx` | Real 404 for unmatched URLs |
 
 `src/app/api/*` are Route Handlers — the only place the browser talks to the
 server about auth (`login`, `otp`, `logout`, `registration`, `reset-password`,
@@ -285,7 +303,9 @@ user's browser. A long-poll channel bridges the gap so the right browser reacts.
   **once** in `(app)/layout.tsx`. It runs a single poll loop for the whole signed-in
   session (`AbortController`, re-poll immediately on a normal return, ~3s backoff on
   transport error, stop on 401) and fans each event out to component `subscribe()`rs
-  and then the global handler index.
+  and then the global handler index. The loop pauses while the tab is hidden (the held
+  poll is aborted) and a returning tab calls `router.refresh()` before polling again —
+  see "Deploying to Cloud Run" for why.
 - **Handler index** (`handlers/index.ts`) — dispatch by `event.type`, one file per
   handler. `App.Events.Event` is a **discriminated union** (`LogoutEvent`, targeted +
   carrying `consumerId`; `SpaceChangeEvent`, global + carrying `resource`;
@@ -299,7 +319,7 @@ user's browser. A long-poll channel bridges the gap so the right browser reacts.
   mid-conversation stays put. Add a reaction by extending `App.Events.Event`, dropping
   a handler file, and registering it here.
 
-The webhook receiver (`src/app/api/keen-webhook/route.ts`) publishes a `logout`
+The webhook receiver (`src/app/api/keen-webhook/[secret]/route.ts`) publishes a `logout`
 event scoped to `consumer.id` for the org instructions `r_consumer_logout` /
 `r_consumer_contract_changed` / `r_consumer_spaces_update`, so only the targeted
 consumer's browser signs out. (Note: Keen specifies `r_consumer_logout` but does not
@@ -325,9 +345,9 @@ Reading a value — **always by field name**, server-side via the connector:
 
 ```ts
 const keen = globalThis.__keenConnector;
-const welcome = await keen.frontSettings.get('unimasters-chat', 'welcome-message');
-const [a, b] = await keen.frontSettings.getMany('unimasters-chat', 'title', 'theme');
-const ok = await keen.frontSettings.has('unimasters-chat', 'theme');
+const welcome = await keen.frontSettings.get('my-agent', 'welcome-message');
+const [a, b] = await keen.frontSettings.getMany('my-agent', 'title', 'theme');
+const ok = await keen.frontSettings.has('my-agent', 'theme');
 ```
 
 `keen.frontSettings` (`src/service/services/keen/keen.front-settings.ts`) is
@@ -464,7 +484,99 @@ cp .env.example .env.local   # then fill in the secrets
 ```
 
 `readKeenConfig()` throws at startup if any var is missing, rather than
-authenticating with `undefined` and failing every request silently.
+authenticating with `undefined` and failing every request silently. In production
+`instrumentation.ts` then exits the process (Next alone would only log it and keep
+serving a broken site); in dev it keeps running so demo mode still works.
 
 > Don't move these into `next.config` — its `env` key string-inlines values into
 > the **client** bundle, which would ship the secrets to the browser.
+
+## Deploying to Cloud Run
+
+The full walkthrough (domain mapping, the Keen side, pitfalls) is in
+[`DEPLOYING.md`](./DEPLOYING.md); this section records this site's own settings.
+
+The site runs on Cloud Run as `entanglement-demo` (`SERVICE` in `cli/config.sh`), built from the `Dockerfile`
+(standalone Next server, `node:24-slim`, non-root). Same scheme as the docs site, with
+secrets added. All settings sit in `cli/config.sh`.
+
+**The address.** With `DOMAIN` empty (the default) the site lives on Cloud Run's own
+deterministic URL, `https://<service>-<project number>.<region>.run.app`, and
+`deploy.sh` sets `KEEN_ORIGIN` to it. Set `DOMAIN` to serve under a custom name:
+`deploy.sh` then maps it and publishes the DNS record (`PROJECT_DNS` / `DNS_ZONE`); the
+parent domain must be verified in Search Console first (`DEPLOYING.md`). Once a domain
+is set, hand out only that address: the relay drops a browser WebSocket from any
+origin but `KEEN_ORIGIN`, and the service keeps answering on its run.app URLs too.
+
+| Script | When |
+| --- | --- |
+| `cli/secrets.sh` | First time, and whenever a secret is rotated. Pushes the secret values from the local env file into Secret Manager (a new version only when the value changed). |
+| `cli/deploy.sh` | First time, after a rotation, a `DOMAIN` change, or when an env value / runtime setting changes. APIs, Artifact Registry, the service account and its access to each secret, build + deploy with the full config, then (with a `DOMAIN`) domain + DNS. Idempotent. |
+| `cli/redeploy.sh` | Every code update. Rebuilds the image and rolls a new revision; keeps everything `deploy.sh` set. Zero downtime. |
+
+The service is public through `--no-invoker-iam-check` (like the docs site): the org
+policy `iam.allowedPolicyMemberDomains` refuses an `allUsers` invoker binding, so
+`--allow-unauthenticated` only warns and the site answers 403.
+
+All three need `gcloud auth login` with rights in your `PROJECT_SVC` project (`cli/config.sh` — fill in your own ids first; the scripts refuse to run on the placeholders). The env file
+defaults to `.env` in the repo root (`ENV_FILE=/path ./cli/deploy.sh` to use another);
+it is read on your machine only.
+
+**Secrets never enter the image.** `.dockerignore` and `.gcloudignore` exclude every
+`.env*` file — this matters, because `next build` copies `.env` into
+`.next/standalone`. The build itself needs no Keen config: the `(app)` layout is
+`force-dynamic`, so nothing that reads the connector is prerendered. At runtime:
+
+- `KEEN_CLIENT_SECRET`, `KEEN_API_KEY_SECRET`, `KEEN_WEBHOOK_SECRET` and
+  `ELEVENLABS_API_KEY` come from **Secret Manager** (`<service>-*`, one region). The
+  service runs as its own account `<service>-run`, which may read exactly these secrets (the role is
+  granted on each secret, not on the project). Cloud Run reads them when an instance
+  starts and hands them to `node server.js` as env vars. Each is pinned to a version
+  number, never `latest`, so a rotation is always an explicit `secrets.sh` +
+  `deploy.sh`.
+- `ELEVENLABS_API_KEY` is optional: while it is empty in the env file, `secrets.sh`
+  skips it and `deploy.sh` deploys without it — dictation then answers 503 "not
+  configured", everything else works. Add the key, run `secrets.sh` + `deploy.sh`.
+- `KEEN_HOST`, `KEEN_WS`, `KEEN_CLIENT_ID`, `KEEN_API_KEY_ID` (and optionally
+  `ELEVENLABS_STT_MODEL`) are plain env vars — addresses and ids, useless without the
+  secrets. `KEEN_ORIGIN` is NOT taken from the env file: `deploy.sh` sets it to the
+  site's address (`site_url` in `cli/config.sh`); the local value is for local runs.
+
+Rotating `KEEN_CLIENT_SECRET` also signs every user out of Google Connect: the
+encrypted Google refresh-token cookie is keyed from it.
+
+**At most one instance, scaled to zero when nobody is on the site**
+(`--max-instances 1 --min-instances 0 --cpu-throttling --cpu-boost --concurrency 1000`).
+
+- One instance, never two: the connector's token, certificate and caches live in
+  process memory, and so does the webhook → long-poll event bus — a second instance
+  would receive webhooks meant for the first.
+- Request-based billing: Cloud Run bills (and gives CPU) only while a request is open.
+  Every **visible** tab holds one `/api/events` long poll, so the instance runs exactly
+  while someone has the site in front of them, and the connector's background work
+  gets CPU then. A **hidden** tab aborts its poll and pauses until it is visible again
+  (`contexts/events/events.tsx`) — otherwise one forgotten tab would keep the instance
+  billed around the clock. The chat itself is unaffected: its WebSocket goes from the
+  browser straight to the Keen relay (`KEEN_WS`), not through Cloud Run.
+- What a paused tab can miss: nothing targeted while the instance lives (the bus
+  queues a consumer's events until its next poll), but a broadcast goes to whichever
+  tab polls first, and an instance that scaled to zero meanwhile starts with an empty
+  queue. A returning tab therefore calls `router.refresh()` before it polls again — the
+  server re-renders spaces, agents and settings from its webhook-fed cache.
+- Cold start: the first visitor after an idle spell is held by the proxy for up to 10s
+  (`waitForAppReady` in `utils/demo.ts`) while the connector boots — token, certificate,
+  then the contract / policy / space-list reads (`isActivated`). Only if that fails do
+  they see the maintenance page.
+- High concurrency because every visible tab holds a long poll for up to 25s.
+
+**The certificate during a rollout.** The new revision's connector redeems a
+certificate code and Keen answers with an `r_cert` webhook — which can land on the old
+revision while traffic is still switching. `tryActivate()` therefore redeems a fresh
+code after ~16s without a certificate.
+
+**Keen side** (the api_key's Webhook record): its webhook URL must be
+`<site>/api/keen-webhook/<KEEN_WEBHOOK_SECRET>` and its origin must be `<site>`.
+Without the webhook the
+connector never receives its certificate and the site stays on the maintenance page.
+**Google Connect:** the Google OAuth client (its id is an agent setting) must list
+`<site>/api/google/callback` as an authorized redirect URI.

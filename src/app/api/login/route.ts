@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { formSchema } from '@/@schema/login';
 import { setSessionCookies } from '@/utils/cookies';
+import { clientEnvelope } from '@/utils/upstream-reply';
 
 /**
  * POST /api/login
@@ -58,13 +59,6 @@ export async function POST(req: NextRequest) {
         // two-token consumer calls read these cookies server-side (this BFF is the
         // only thing that ever sees the raw tokens).
         if (envelope.success === true && tokens && 'access_token' in tokens) {
-            // Read the sealed claims server-side (verify signature → open `hash`).
-            // getTokenPayload is async, so it MUST be awaited; `keen` is already
-            // narrowed non-null above. The tokens still go into httpOnly cookies
-            // below — this is the decoded identity for any server-side use.
-            const tokenPayload = await keen.tools.getTokenPayload(tokens.access_token);
-            console.log('[login] token payload:', tokenPayload);
-
             const res = NextResponse.json({ success: true, status: 200, message: 'Success', isToken: true });
 
             return setSessionCookies(res, {
@@ -74,9 +68,12 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // OTP ("Verify" / result.hash) and rejections (success:false / 406) pass
-        // through with isToken:false so the client branches on the flag, not the shape.
-        return NextResponse.json({ ...envelope, isToken: false });
+        // OTP ("Verify" / result.hash) and rejections (success:false / 406) go back
+        // with isToken:false so the client branches on the flag, not the shape. Only
+        // the OTP hash and a safe message leave — never Keen's raw envelope.
+        const hash = tokens && 'hash' in tokens ? tokens.hash : undefined;
+
+        return NextResponse.json({ ...clientEnvelope(envelope, 'Sign-in failed. Check your email and password.'), ...(hash ? { result: { hash } } : {}), isToken: false });
     } catch (err) {
         console.log(`[login] Error: ${(err as Error).message}`);
         return NextResponse.json({ success: false, status: 500, message: 'Internal error.' }, { status: 500 });

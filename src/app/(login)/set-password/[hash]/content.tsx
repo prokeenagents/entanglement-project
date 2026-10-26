@@ -12,7 +12,7 @@ export default function Content(props: React.PropsWithChildren) {
     const { children } = props;
 
     return (
-        <Container maxW="3xl" py={20}>
+        <Container maxW="md" px="0">
             {children}
         </Container>
     );

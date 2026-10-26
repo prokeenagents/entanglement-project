@@ -1,11 +1,12 @@
 import KeenConnector from './keen.connector';
+import { scopeSpaceList } from './keen.space-scope';
 
 export default class KeenResources {
     constructor(private KeenConnector: KeenConnector) {}
 
     /**
      * Fetch the list of spaces available to the partner (application-token
-     * resource). Returns the parsed body, false on a non-JSON response, or null
+     * resource), scoped to this api key's contract before it is cached. Returns the parsed body, false on a non-JSON response, or null
      * when not connected / on a transport error.
      */
     async getSpaceList() {
@@ -42,11 +43,15 @@ export default class KeenResources {
 
             console.log(`[keen] Resources: ${resourceName} → HTTP ${result.status}`);
 
-            if (result.ok) {
-                this.KeenConnector.cache.setSpaceList(data);
+            if (!result.ok) {
+                return data;
             }
 
-            return data;
+            // Keep only this contract's spaces, without their deployment tokens.
+            const scoped = scopeSpaceList(data, this.KeenConnector.cache.getConsumerContract()?.result ?? null);
+            this.KeenConnector.cache.setSpaceList(scoped);
+
+            return scoped;
         } catch (err) {
             console.log(`[keen] ERROR: Resources: ${resourceName} → ${(err as Error).message}`);
             return null;

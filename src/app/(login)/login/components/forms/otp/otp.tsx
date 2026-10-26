@@ -13,7 +13,6 @@ import { useLogin } from '@/hooks/login';
 import { LocalStorage } from '@/utils/localStorage';
 import { OTP_CONFIG } from '@/configs/otp.config';
 import { CardShell } from '@/components/ui/card-shell';
-import { Logo } from '@/components/ui/logo';
 
 export const Component: React.FC<{
     otpState: App.ReactState<boolean>;
@@ -116,21 +115,10 @@ export const Component: React.FC<{
     return (
         <>
             <VStack gap="8">
-                <HStack gap="1">
-                    <Logo />
-                    <VStack gap="0" alignItems="flex-start">
-                        <Text fontSize="sm" color="cyan.700" lineHeight="1.2">
-                            <strong>Entanglement</strong>
-                        </Text>
-                        <Text fontSize="xs" color="cyan.700" opacity="0.75" lineHeight="1.2">
-                            Project
-                        </Text>
-                    </VStack>
-                </HStack>
-                <CardShell title="OTP - Sign In" description="Check your mail box and enter the OTP code.">
+                <CardShell title="Check your email" description="We sent you a one-time code. Enter it below to finish signing in." width={420}>
                     <form action="/" onSubmit={handleSubmit(onSubmit)}>
                         <HStack w="100%" justifyContent="center" align="center">
-                            <VStack gap="4" w="450px">
+                            <VStack gap="4" w="full">
                                 <Stack gap="4">
                                     <Progress.Root w="100%" maxW="100%" value={percentLeft}>
                                         <Progress.Label mb="2" w="100%">

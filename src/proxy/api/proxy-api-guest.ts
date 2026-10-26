@@ -3,18 +3,23 @@
  * Back End !
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { GUEST_API_CONFIG } from '@/configs/api.config';
+import { AUTH_API_CONFIG, GUEST_API_CONFIG } from '@/configs/api.config';
 import { apiError } from './api-error';
 
 export async function proxyApiGuest(request: NextRequest, pathname: string) {
-    const URLs = Object.values(GUEST_API_CONFIG).map(({ URL }) => URL);
+    const guestURLs = Object.values(GUEST_API_CONFIG).map(({ URL }) => URL);
+    const authURLs = Object.values(AUTH_API_CONFIG).map(({ URL }) => URL);
 
-    // Logged out, so only the guest surface is reachable. 401 rather than 404: the
-    // route probably DOES exist, they just can't have it without a session — and a
-    // 404 here would tell an anonymous caller which routes exist and which don't.
-    if (!URLs.includes(pathname)) {
-        return apiError(404, 'Unknown API route.');
+    if (guestURLs.includes(pathname)) {
+        return NextResponse.next();
     }
 
-    return NextResponse.next();
+    // A signed-in route without a valid session — usually an expired one. 401, so
+    // callers (the events long-poll, the chat calls) know to stop and re-authenticate
+    // instead of treating it as a missing route and retrying forever.
+    if (authURLs.includes(pathname)) {
+        return apiError(401, 'Session expired. Please sign in again.');
+    }
+
+    return apiError(404, 'Unknown API route.');
 }

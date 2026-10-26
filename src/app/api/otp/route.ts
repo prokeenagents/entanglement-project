@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { formSchema } from '@/@schema/otp';
 import { setSessionCookies } from '@/utils/cookies';
+import { clientEnvelope } from '@/utils/upstream-reply';
 
 /**
  * POST /api/otp
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
 
         // Bad PIN / expired hash / rejection — pass through with isToken:false so the
         // client branches on the flag, not the shape.
-        return NextResponse.json({ ...envelope, isToken: false });
+        return NextResponse.json({ ...clientEnvelope(envelope, 'That code did not work. Check it and try again.'), isToken: false });
     } catch (err) {
         console.log(`[otp] Error: ${(err as Error).message}`);
         return NextResponse.json({ success: false, status: 500, message: 'Internal error.' }, { status: 500 });

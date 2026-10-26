@@ -1,6 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
+import { newPasswordSchema } from './password';
+
 /**
  * The logged-out ("outside") registration claim. Password is collected up front and
  * Keen parks the whole thing behind a hash emailed to the consumer — nothing is
@@ -17,8 +19,8 @@ const commonFields = {
     firstName: z.string().trim().min(1, { error: 'First name is required' }).max(100),
     lastName: z.string().trim().min(1, { error: 'Last name is required' }).max(100),
     email: z.email().min(2, { error: 'Invalid email' }),
-    password: z.string().min(8, { error: 'Invalid password' }),
-    confirmPassword: z.string().min(8, { error: 'Invalid confirm password' }),
+    password: newPasswordSchema,
+    confirmPassword: z.string().min(1, { error: 'Confirm your password' }),
     gender: z.enum(['male', 'female', 'other'], { error: 'Select a gender' }),
     // A checkbox — boolean().refine (not literal(true)) so the inferred type stays
     // `boolean`, matching the `false` default; the refine still rejects an unticked box.

@@ -8,11 +8,12 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 
 import { formSchema, generateResetPasswordHookFormPayload } from '@/@schema/reset-password';
-import { Box, Button, Field, Heading, HStack, Input, Separator, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
+import { Button, Field, HStack, Input, Separator, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { PAGE_CONFIG } from '@/configs/page.config';
 import { useLogin } from '@/hooks/login';
-import { Logo } from '@/components/ui/logo';
 import { CardShell } from '@/components/ui/card-shell';
+import { StatusCard } from '@/components/ui/status-card';
+import { PASSWORD_HINT } from '@/@schema/password';
 
 export const Component: React.FC = () => {
     const router = useRouter();
@@ -61,42 +62,23 @@ export const Component: React.FC = () => {
 
     if (sent) {
         return (
-            <HStack w="100%" justifyContent="center" align="center">
-                <VStack gap="4" w="450px" align="stretch">
-                    <Heading size="2xl" mb={2}>
-                        Check your inbox
-                    </Heading>
-
-                    <Text>If that email address has an account, we&apos;ve sent it a link to finish resetting your password. Your password stays unchanged until you follow it.</Text>
-
-                    <Separator w="full" />
-
-                    <Button type="button" variant="plain" w="full" onClick={() => router.push(PAGE_CONFIG.LOGIN.URL)}>
-                        <Text as="span">Back to login</Text>
-                    </Button>
-                </VStack>
-            </HStack>
+            <StatusCard
+                tone="mail"
+                title="Check your inbox"
+                message="If that email address has an account, we've sent it a link to finish resetting your password. Your password stays unchanged until you follow it."
+                actionLabel="Back to sign in"
+                actionHref={PAGE_CONFIG.LOGIN.URL}
+            />
         );
     }
 
     return (
         <>
             <VStack gap="8">
-                <HStack gap="1">
-                    <Logo />
-                    <VStack gap="0" alignItems="flex-start">
-                        <Text fontSize="sm" color="cyan.700" lineHeight="1.2">
-                            <strong>Entanglement</strong>
-                        </Text>
-                        <Text fontSize="xs" color="cyan.700" opacity="0.75" lineHeight="1.2">
-                            Project
-                        </Text>
-                    </VStack>
-                </HStack>
-                <CardShell title="Reset your password" description="Fill the form bellow and follow the instruction received in your mail box.">
+                <CardShell title="Reset your password" description="Enter your email and we will send you instructions to set a new password.">
                     <form action="/" onSubmit={handleSubmit(onSubmit)}>
                         <HStack w="100%" justifyContent="center" align="center">
-                            <VStack gap="4" w="450px">
+                            <VStack gap="4" w="full">
                                 <Stack w="full" gap="2">
                                     <Field.Root invalid={!!errors.email || !!errors.root} gap="0">
                                         <Field.Label>
@@ -116,6 +98,7 @@ export const Component: React.FC = () => {
                                         <Field.ErrorText>
                                             <Text as="span">{errors.password?.message}</Text>
                                         </Field.ErrorText>
+                                        {!errors.password && <Field.HelperText mt="1">{PASSWORD_HINT}</Field.HelperText>}
                                     </Field.Root>
 
                                     <Field.Root invalid={!!errors.confirmPassword || !!errors.root} gap="0">

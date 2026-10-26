@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 /**
  * POST /api/keen-callback
@@ -8,29 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
  * action lands, ms-consumer fires a fire-and-forget POST here with a per-action
  * body like `{ action, consumer, apikeyID, contractKey }`.
  *
- * For now it just accepts the POST, logs the body, and acks 200. The ack is
- * ignored upstream (the call is fire-and-forget), so any 2xx is fine.
+ * It only acks 200. The body is never read or logged: it names the consumer and
+ * the contract key, and nothing here acts on it. The ack is ignored upstream (the
+ * call is fire-and-forget), so any 2xx is fine. The proxy rate-limits this path.
  */
 
 /**
  * THIS ONE IS WHEN WE GIVE A X-CALLBACK-URL TO KEEN API
  */
-export async function POST(req: NextRequest) {
-    let body: {
-        'synch-data': string;
-        result: string;
-    } | null = null;
-
-    try {
-        body = (await req.json()) as unknown as {
-            'synch-data': string;
-            result: string;
-        };
-
-        console.log(body);
-    } catch (err) {
-        console.log(`[keen] Error: ${(err as Error).message}`);
-    }
-
+export async function POST() {
     return NextResponse.json({ success: true });
 }

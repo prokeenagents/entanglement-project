@@ -1,6 +1,8 @@
 import { getKeen } from '@/service/services/keen/keen';
 import { getAccessToken } from '@/utils/cookies';
 import { UserContent } from './content';
+import { isDemoMode } from '@/utils/demo';
+import { DEMO_PROFILE } from '@/demo/fixtures';
 
 /**
  * Server Component — fetch the consumer's profile (name / gender / dob) HERE, where
@@ -13,6 +15,10 @@ import { UserContent } from './content';
  * authenticated page by the proxy (a signed-out visitor is bounced to /login).
  */
 export default async function UserPage() {
+    if (isDemoMode()) {
+        return <UserContent profile={DEMO_PROFILE} />;
+    }
+
     const accessToken = await getAccessToken();
     const reply = accessToken ? await getKeen().consumer.getProfile({ accessToken }) : null;
     const profile = reply?.success ? (reply.data ?? null) : null;

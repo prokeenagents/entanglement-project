@@ -387,7 +387,6 @@ declare global {
             updatedAt: string;
             title: string;
             description: string;
-            deploymentToken: string;
             agents: Keen.SpaceListCacheAgent[];
         }
 
@@ -430,12 +429,14 @@ declare global {
          * are empty.
          */
         interface ConsumerData {
+            /** Needed in the browser for the chat WebSocket. There is deliberately no refreshToken here. */
             accessToken: string | undefined;
-            refreshToken: string | undefined;
             tokenPayload: Keen.AccessTokenPayload | null;
             consumerSpaces: Keen.SpaceListCacheResult[];
             agents: Keen.SpaceListCacheAgent[];
             wsUrl?: string;
+            /** True when served from the dev-only demo fixtures (utils/demo.ts). */
+            demo?: boolean;
         }
 
         namespace Webhook {

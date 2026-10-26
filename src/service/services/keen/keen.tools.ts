@@ -1,6 +1,8 @@
 import { jwtVerify } from 'jose';
 import KeenConnector from './keen.connector';
-import { getAccessToken, getRefreshToken } from '@/utils/cookies';
+import { getAccessToken } from '@/utils/cookies';
+import { isDemoMode } from '@/utils/demo';
+import { DEMO_CONSUMER_DATA } from '@/demo/fixtures';
 
 export default class KeenTools {
     constructor(private KeenConnector: KeenConnector) {}
@@ -123,17 +125,25 @@ export default class KeenTools {
      * claim, and flattens every agent across those entitled spaces. Server-only (the
      * tokens are httpOnly cookies + the cache is a server singleton). When there's no
      * session the tokens are undefined, tokenPayload is null, and the arrays are empty.
+     *
+     * This object is handed to the browser through ConsumerProvider, so it carries the
+     * ACCESS token only (the chat WebSocket stamps it on every frame). The 28-day
+     * refresh token never leaves the httpOnly cookie; /api/refresh reads it there.
      */
     async getConsumerData(): Promise<Keen.ConsumerData> {
+        // Dev-only fixture consumer (utils/demo.ts) — no cookies, no connector.
+        if (isDemoMode()) {
+            return DEMO_CONSUMER_DATA;
+        }
+
         const accessToken = await getAccessToken();
-        const refreshToken = await getRefreshToken();
 
         const tokenPayload = accessToken ? await this.getTokenPayload(accessToken) : null;
         const consumerSpaces = this.getConsumerSpaces(tokenPayload);
         const agents = consumerSpaces.flatMap(space => space.agents ?? []);
         const wsUrl = process.env.KEEN_WS;
 
-        return { accessToken, refreshToken, tokenPayload, consumerSpaces, agents, wsUrl };
+        return { accessToken, tokenPayload, consumerSpaces, agents, wsUrl };
     }
 
     /**

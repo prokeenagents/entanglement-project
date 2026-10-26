@@ -26,10 +26,10 @@
             "skipFiles": ["<node_internals>/**"]
         },
         {
-            "name": "Next.js: debug (webpack, like ms-ui)",
+            "name": "Next.js: debug (launch dev + inspector)",
             "type": "node-terminal",
             "request": "launch",
-            "command": "npm run dev:debug",
+            "command": "npm run dev",
             "cwd": "${workspaceFolder}"
         }
     ]

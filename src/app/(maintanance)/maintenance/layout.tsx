@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { GuestLayout } from '@/components/ui/guest-layout';
 
 export default function Layout(props: Readonly<Readonly<React.PropsWithChildren>>) {
     const { children } = props;
@@ -13,5 +14,5 @@ export default function Layout(props: Readonly<Readonly<React.PropsWithChildren>
 async function ProviderShell(props: Readonly<Readonly<React.PropsWithChildren>>) {
     const { children } = props;
 
-    return <>{children}</>;
+    return <GuestLayout>{children}</GuestLayout>;
 }
